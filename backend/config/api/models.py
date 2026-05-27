@@ -33,24 +33,24 @@ class Audit_Log(models.Model):
 
 class Class(models.Model):
     class_id = models.BigAutoField(primary_key=True)
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name="teacher")
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="teacher")
     class_name = models.CharField(max_length=255)
-    schedule_days = models.CharField(max_length=255)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+    #schedule_days = models.CharField(max_length=255)
+    #start_time = models.TimeField()
+    #end_time = models.TimeField()
 
 class Parent(models.Model):
     parent_id = models.BigAutoField(primary_key=True)
     corresponding_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="parents")
-    phone_number = models.CharField(max_length=15)
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
 
 class Student(models.Model):
     student_id = models.BigAutoField(primary_key=True)
     corresponding_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="students")
-    parent = models.ForeignKey(Parent, on_delete=models.CASCADE, related_name="child")
-    classroom = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="students")
-    program_type = models.CharField(max_length=255)
-    enrollment_type = models.CharField(max_length=255)
+    parent = models.ForeignKey(Parent, on_delete=models.CASCADE, related_name="child", null=True, blank= True)
+    classroom = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="students", null=True, blank= True)
+    #program_type = models.CharField(max_length=255)
+    #enrollment_type = models.CharField(max_length=255)
 
 class Attendance_Log(models.Model):
     attendance_log_id = models.BigAutoField(primary_key=True)
@@ -83,8 +83,8 @@ class Review_Log(models.Model):
     date = models.DateField()
 
 class Behavior_Log(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="review_log")
-    logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_review_log")
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="behavior_log")
+    logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_behavior_log")
     score = models.IntegerField()  #Out of 10
     comments = models.CharField(max_length=1000, null= True, blank= True)
     date = models.DateField()
@@ -93,10 +93,10 @@ class Report_Card(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="report_card")
     logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_report_card")
     classroom = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="student_report_card")
-    behavior_score = score = models.IntegerField()  #Out of 5
-    reading_score = score = models.IntegerField()  #Out of 5
-    review_score = score = models.IntegerField()  #Out of 5
-    memorization_score = score = models.IntegerField()  #Out of 5
-    attendance_score = score = models.IntegerField()  #Out of 5
+    behavior_score= models.IntegerField()  #Out of 5
+    reading_score = models.IntegerField()  #Out of 5
+    review_score = models.IntegerField()  #Out of 5
+    memorization_score = models.IntegerField()  #Out of 5
+    attendance_score = models.IntegerField()  #Out of 5
     trimester = models.IntegerField() #Out of 3
     date = models.DateField()

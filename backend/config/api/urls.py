@@ -7,4 +7,7 @@ urlpatterns = [
     path('test/', views.test, name = "test"),
     path('register/', RegisterView.as_view(), name = "register"),
     path("login/", TokenObtainPairView.as_view(), name="login"),
+    path("create_class/", CreateClassView.as_view(), name="create_class"),
+    path("select_classes/", FilterClasses.as_view(), name="filter_class"),
+
 ]

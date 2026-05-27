@@ -3,7 +3,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.contrib.auth import get_user_model
 from .serializers import *
+from .models import *
 from rest_framework import generics
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
 User = get_user_model()
 
@@ -16,9 +19,21 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
 
-
 # Create Classroom
+class CreateClassView(generics.CreateAPIView):
+    serializer_class = CreateClassSerializer
+
 # Return all Classes of a Teacher
+### BUGGED ALWAYS RETURNS [] 
+class FilterClasses(APIView):
+    def get(self, request):
+        teacher_name = self.request.query_params.get("teacher_name")
+        if (Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name))):
+            classes = Class.objects.filter(teacher = Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name)))
+            serializer  = ClassSerializer(classes, many=True)
+            return Response(serializer.data)
+        else:
+            return Response([])
 
 
 # Add Student to Classroom

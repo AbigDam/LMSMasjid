@@ -17,7 +17,8 @@ import axios from 'axios';
 export default function Index() {
   useEffect(() => {
       /* 
-      Example Register Call
+      //Example Register Call
+
       axios.post('http://127.0.0.1:8000/api/register/', {
         first_name: "FirstName",
         last_name: "LastName",
@@ -27,21 +28,50 @@ export default function Index() {
       })
       .then(res => console.log(res.data))
       .catch(err => console.log(err));
-      
       Username is automatically set as first_name + last_name with no spaces
       */
-
+    
       /*
-      Example Login Call 
+      Example use of Log-in Tokens
+      let accessToken = "";
+
+      //Example Login Call 
       axios.post("http://127.0.0.1:8000/api/login/", {
         username: "FirstNameLastName",
         password: "examplePass"
       })
       .then(res => {
-        console.log(res.data);
+        console.log(res.data)
+        accessToken = res.data.access;
+
+        //Example Create Class Call
+        axios.post(
+        "http://127.0.0.1:8000/api/create_class/",
+        {
+          class_name: "class1"
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      )
+      .then(res => console.log(res.data))
+      .catch(err => console.log(err));
+
       })
       .catch(err => console.log(err));
       */
+
+      
+    axios.get("http://127.0.0.1:8000/api/select_classes/", {
+      params: {
+        teacher_name: "FirstNameLastName"
+      }
+    })
+    .then(res => console.log(res.data))
+    .catch(err => console.log(err));
+      
 
   }, []);
 
