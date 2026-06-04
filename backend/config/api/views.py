@@ -18,6 +18,9 @@ def test(request):
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
+#Log Out
+
+### Far Future: Change Password
 
 # Create Classroom
 class CreateClassView(generics.CreateAPIView):
@@ -36,38 +39,26 @@ class FilterClasses(APIView):
             return Response([])
 
 
+# Create Account Student 
 # Add Student to Classroom
 # Remove Student from Classroom
 # Return all Students in Class
 
-# Log Student Attendance
-# Return list of days student was present
+#Log Functions
+#   CreateLog(student, teacher, surah, starting_ayah, ending_ayah, passed, comments, dates, log_type)
+#   ReturnLogs(student, passed, starting_date, ending_date, log_type)
 
-# Log Student Reading 
-# Return Student Reading on Date
-# Return pages read from InitialDay to FinalDay
-# Return total pages read
+# Creates Report Card for a date
+# Return report card of partciular year/trimester
 
-#Log Student Review
-# Return Student Reivew on a date
-# Return surahs reviewed from InitialDay to FinalDay
-# Return total surahs reviewed from  
 
-### If a "pass" is selected as true for a review, it will be logged as reivew and a memorization log will be genrated
-### If "pass" is false for a surah that was already memorized, that surah will be marked in memorization log as forgotten
 
-# Log Student Memorization
-# Remove Student Memorization (Student failed review and has forgotten Surah)
-# Return total list of attempted Surahs for a student
-# Return total list of memorized Surahs for a student
-# Return list of surahs memorized for InitialDay to FinalDay 
-# Return list of surahs attempted for InitialDay to FinalDay 
-# Return percent of Quran memorized 
+###  Muwahid Starts here ###
 
 # Log Student Behavior
 # Return Behavior log on Date
-# Return list of dates with comments
-# Return average behavior score (out of 10)
+# Return list of dates that aren't 5
 
-#Log report card
-# Return report card of partciular year/trimester
+# Log Student Attendance
+    ## If an attendance log exsists for the previous day, but no behavior log exsists at that day, then make a behavior log for that day
+# Return list of days student was present

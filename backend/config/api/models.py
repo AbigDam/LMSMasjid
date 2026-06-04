@@ -49,6 +49,9 @@ class Student(models.Model):
     corresponding_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="students")
     parent = models.ForeignKey(Parent, on_delete=models.CASCADE, related_name="child", null=True, blank= True)
     classroom = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="students", null=True, blank= True)
+    #assignment_surah = models.IntegerField()
+    #assignment_ayah_init = models.IntegerField()
+    #assignment_ayah_final = models.IntegerField()
     #program_type = models.CharField(max_length=255)
     #enrollment_type = models.CharField(max_length=255)
 
@@ -56,36 +59,26 @@ class Attendance_Log(models.Model):
     attendance_log_id = models.BigAutoField(primary_key=True)
     classroom = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="student_attendances")
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="attendances")
+    present = models.BooleanField()
     date = models.DateField()
 
-class Reading_Log(models.Model):
-    reading_log_id = models.BigAutoField(primary_key=True)
+class Log(models.Model):
+    log_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="reading_log")
     logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_reading_log")
-    page = models.IntegerField()
-    comments = models.CharField(max_length=1000, null= True, blank= True)
-    date = models.DateField()
-
-class Memorization_Log(models.Model):
     surah = models.IntegerField()
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="memorization_log")
-    logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_memorization_log")
-    comments = models.CharField(max_length=1000, null= True, blank= True)
-    forgotten = models.BooleanField()
-    date = models.DateField()
-
-class Review_Log(models.Model):
-    surah = models.IntegerField()
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="review_log")
-    logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_review_log")
+    ayah_init = models.IntegerField()
+    ayah_final = models.IntegerField()
     passed = models.BooleanField()
     comments = models.CharField(max_length=1000, null= True, blank= True)
     date = models.DateField()
+    log_type = models.IntegerField() # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+
 
 class Behavior_Log(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="behavior_log")
     logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_behavior_log")
-    score = models.IntegerField()  #Out of 10
+    score = models.IntegerField()  #Out of 5
     comments = models.CharField(max_length=1000, null= True, blank= True)
     date = models.DateField()
 
