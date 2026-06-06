@@ -39,7 +39,8 @@ class CreateClassSerializer(serializers.Serializer):
 
         return classroom
 
-class ClassSerializer(serializers.Serializer):
+## Temporary Serializer, We will need to add more things
+class ClassSerializer(serializers.ModelSerializer):
     class Meta:
         model = Class
         fields = "__all__"

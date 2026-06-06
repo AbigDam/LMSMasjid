@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 import AuthScene from '../components/AuthScene';
 import TextField from '../components/TextField';
@@ -163,7 +164,14 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.link}>Create an account</Text>
         </Pressable>
       </View>
+
+
+      <Pressable onPress={() => navigation.navigate('TestBackend')}>
+      <Text style={{ color: 'red' }}>Backend Debug</Text>
+    </Pressable>
+
     </AuthScene>
+    
   );
 }
 

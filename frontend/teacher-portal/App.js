@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import LoginScreen from './screens/LoginScreen';
 import SignupScreen from './screens/SignupScreen';
 import DashboardScreen from './screens/DashboardScreen';
+import TestBackend from './screens/TestBackend';
 
 const Stack = createNativeStackNavigator();
 
@@ -40,6 +41,7 @@ export default function App() {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="TestBackend" component={TestBackend} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

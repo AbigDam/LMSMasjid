@@ -19,7 +19,6 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
 #Log Out
-
 ### Far Future: Change Password
 
 # Create Classroom
@@ -27,16 +26,12 @@ class CreateClassView(generics.CreateAPIView):
     serializer_class = CreateClassSerializer
 
 # Return all Classes of a Teacher
-### BUGGED ALWAYS RETURNS [] 
 class FilterClasses(APIView):
     def get(self, request):
         teacher_name = self.request.query_params.get("teacher_name")
-        if (Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name))):
-            classes = Class.objects.filter(teacher = Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name)))
-            serializer  = ClassSerializer(classes, many=True)
-            return Response(serializer.data)
-        else:
-            return Response([])
+        classes = Class.objects.filter(teacher = Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name)))
+        serializer  = ClassSerializer(classes, many=True)
+        return Response(serializer.data)
 
 
 # Create Account Student 
