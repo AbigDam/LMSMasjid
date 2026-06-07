@@ -20,22 +20,9 @@ export default function TestBackend() {
     .catch(err => console.log(err));
   }
 
-  async function testHealth() {
-    try {
-      const res = await axios.get("http://10.0.2.2:8000/api/");
-      log(res.data);
-    } catch (err) {
-      log(err.response?.data || err.message);
-    }
-  }
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Backend Test Panel</Text>
-
-      <Pressable style={styles.button} onPress={testHealth}>
-        <Text style={styles.buttonText}>Test API Root</Text>
-      </Pressable>
 
       <Pressable style={styles.button} onPress={testSelectClasses}>
         <Text style={styles.buttonText}>Test Select Classes</Text>

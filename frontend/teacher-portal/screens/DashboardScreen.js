@@ -110,14 +110,14 @@ export default function DashboardScreen({ navigation }) {
   }
 
   function handleNavigateClass(course) {
-    // Placeholder — class pages are owned by teammates in a later phase.
-    console.log('TODO: open class page for', course.title);
-    setMenuOpen(false); // tapping a class closes the mobile drawer
+    navigation.navigate('AddLog', { course }); 
+    setMenuOpen(false);
   }
 
   function handleViewDetails(course) {
     // Placeholder — Course Details page is out of scope for FE-1.
-    console.log('TODO: View Course Details for', course.title);
+    navigation.navigate('AddLog', { course }); 
+    setMenuOpen(false);
   }
 
   // Prayer strip is shared; on desktop it sits above My Courses, on mobile it
@@ -289,6 +289,11 @@ export default function DashboardScreen({ navigation }) {
           </Animated.View>
         </View>
       ) : null}
+
+            <Pressable onPress={() => navigation.navigate('AddLog')}>
+      <Text style={{ color: 'red' }}>Backend Debug</Text>
+    </Pressable>
+
     </SafeAreaView>
   );
 }

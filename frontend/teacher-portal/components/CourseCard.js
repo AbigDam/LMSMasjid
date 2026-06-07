@@ -66,7 +66,7 @@ export default function CourseCard({ course, onViewDetails }) {
         style={({ pressed }) => [styles.detailsBtn, pressed && styles.detailsBtnPressed]}
         onPress={onViewDetails}
       >
-        <Text style={styles.detailsBtnText}>View Course Details</Text>
+        <Text style={styles.detailsBtnText}>Open Student Logs</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textOnPrimary} />
       </Pressable>
     </View>

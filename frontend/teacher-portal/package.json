@@ -6,12 +6,13 @@
     "@expo/metro-runtime": "~56.0.13",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-navigation/native": "^7.2.5",
+    "@react-navigation/native": "^7.2.6",
     "@react-navigation/native-stack": "^7.16.0",
     "axios": "^1.17.0",
     "expo": "~56.0.8",
     "expo-linear-gradient": "~56.0.4",
     "expo-status-bar": "~56.0.4",
+    "next-themes": "^0.4.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
@@ -25,5 +26,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@types/react": "~19.2.14",
+    "typescript": "~6.0.3"
+  }
 }

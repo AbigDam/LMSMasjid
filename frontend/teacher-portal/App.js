@@ -20,6 +20,7 @@ import LoginScreen from './screens/LoginScreen';
 import SignupScreen from './screens/SignupScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import TestBackend from './screens/TestBackend';
+import AddLogScreen from './screens/AddLogScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -42,6 +43,7 @@ export default function App() {
           <Stack.Screen name="Signup" component={SignupScreen} />
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="TestBackend" component={TestBackend} />
+          <Stack.Screen name="AddLog" component={AddLogScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
