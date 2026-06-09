@@ -1,6 +1,6 @@
 // screens/LoginScreen.js
 // -----------------------------------------------------------------------------
-// Al-Hidaya teacher login (Phase I — MOCK auth only, no backend).
+// Al-Hidaya teacher login (Phase II - Backend Integration).
 //
 // Behaviour:
 //   - Email + password (password masked by default, with show/hide toggle)
@@ -24,75 +24,115 @@ import axios from 'axios';
 
 import AuthScene from '../components/AuthScene';
 import TextField from '../components/TextField';
-import { isValidEmail, validatePassword } from '../constants/validation';
+import { validatePassword } from '../constants/validation';
 import { colors, spacing, radii, fonts, shadow } from '../constants/theme';
+import { useContext } from 'react';
+import { useAuth } from '../context/AuthContext';
 
-const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
+const REMEMBERED_USERNAME_KEY = 'rememberedUsername';
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
+  const { setAuthenticated } = useAuth();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
 
   // On mount, pre-fill a previously remembered email (if any).
-  useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem(REMEMBERED_EMAIL_KEY);
-        if (saved) {
-          setEmail(saved);
-          setRememberMe(true);
-        }
-      } catch (e) {
-        console.warn('Could not read remembered email:', e);
-      }
-    })();
-  }, []);
-
-  function validate(trimmedEmail) {
-    const next = {};
-    if (!trimmedEmail) {
-      next.email = 'Email is required.';
-    } else if (!isValidEmail(trimmedEmail)) {
-      next.email = 'Enter a valid email address.';
-    }
-    const pwError = validatePassword(password);
-    if (pwError) next.password = pwError;
-    return next;
-  }
-
-  async function handleLogin() {
-    const trimmedEmail = email.trim(); // always trim the email
-    const validationErrors = validate(trimmedEmail);
-    setErrors(validationErrors);
-    if (Object.keys(validationErrors).length > 0) return;
-
-    // Remember-me: persist ONLY the email (never the password).
+useEffect(() => {
+  (async () => {
     try {
-      if (rememberMe) {
-        await AsyncStorage.setItem(REMEMBERED_EMAIL_KEY, trimmedEmail);
-      } else {
-        await AsyncStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      const saved = await AsyncStorage.getItem(
+        REMEMBERED_USERNAME_KEY
+      );
+
+      if (saved) {
+        const split = saved.split('_');
+
+        if (split.length >= 2) {
+          setFirstName(split[0]);
+          setLastName(split.slice(1).join('_'));
+        }
+
+        setRememberMe(true);
       }
     } catch (e) {
-      console.warn('Could not update remembered email:', e);
+      console.warn('Could not read remembered username:', e);
+    }
+  })();
+}, []);
+function validate() {
+  const next = {};
+
+  if (!firstName.trim()) {
+    next.firstName = 'First name is required.';
+  }
+
+  if (!lastName.trim()) {
+    next.lastName = 'Last name is required.';
+  }
+
+  const pwError = validatePassword(password);
+
+  if (pwError) {
+    next.password = pwError;
+  }
+
+  return next;
+}
+
+async function handleLogin() {
+  const validationErrors = validate();
+
+  setErrors(validationErrors);
+
+  if (Object.keys(validationErrors).length > 0) {
+    return;
+  }
+
+  const username =
+    `${firstName.trim()}${lastName.trim()}`
+      .replace(/\s+/g, '');
+
+  try {
+    if (rememberMe) {
+      await AsyncStorage.setItem(
+        REMEMBERED_USERNAME_KEY,
+        `${firstName.trim()}_${lastName.trim()}`
+      );
+    } else {
+      await AsyncStorage.removeItem(
+        REMEMBERED_USERNAME_KEY
+      );
     }
 
-    // TODO (Django auth): replace this mock with a real request, e.g.
-    //   const res = await fetch(`${API_URL}/api/auth/login/`, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ email: trimmedEmail, password }),
-    //   });
-    //   if (!res.ok) { setErrors({ password: 'Invalid credentials' }); return; }
-    //   const { token } = await res.json();
-    //   await SecureStore.setItemAsync('authToken', token); // NOT AsyncStorage
-    //
-    // Phase I: any input that passes validation "logs in".
-    // `replace` so the back gesture can't return to the login screen.
-    navigation.replace('Dashboard');
+    const response = await axios.post(
+      'http://127.0.0.1:8000/api/login/',
+      {
+        username,
+        password,
+      }
+    );
+
+    const accessToken = response.data.access;
+
+    await AsyncStorage.setItem('authToken', accessToken);
+
+    // 🔥 THIS is the only navigation trigger you need
+    setAuthenticated(true);
+
+  } catch (error) {
+    console.error(error);
+
+    setErrors({
+      password:
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        'Invalid credentials',
+    });
   }
+}
 
   function handleForgotPassword() {
     // Placeholder — reset flow (Django password reset) comes later.
@@ -105,17 +145,24 @@ export default function LoginScreen({ navigation }) {
       <Text style={styles.welcomeSub}>Sign in to manage your classes</Text>
 
       <TextField
-        label="Email"
-        iconName="mail-outline"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@al-hidaya.org"
-        error={errors.email}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-        returnKeyType="next"
+        label="First Name"
+        iconName="person-outline"
+        value={firstName}
+        onChangeText={setFirstName}
+        placeholder="First Name"
+        error={errors.firstName}
+        autoCapitalize="words"
       />
+
+      <TextField
+        label="Last Name"
+        iconName="person-outline"
+        value={lastName}
+        onChangeText={setLastName}
+        placeholder="Last Name"
+        error={errors.lastName}
+        autoCapitalize="words"
+/>
 
       <TextField
         label="Password"

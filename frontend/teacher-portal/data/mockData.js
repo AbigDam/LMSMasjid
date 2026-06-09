@@ -54,13 +54,7 @@ export const mockCourses = [
 ];
 
 // Today's Iqama (congregation) times — from al-hidaya.org.
-export const mockPrayerTimes = [
-  { name: 'Fajr', iqama: '4:15 AM' },
-  { name: 'Dhuhr', iqama: '1:15 PM' },
-  { name: 'Asr', iqama: '5:30 PM' },
-  { name: 'Maghrib', iqama: 'On time' },
-  { name: 'Isha', iqama: '10:15 PM' },
-];
+
 
 // Community announcements — modelled on Al-Hidaya's posted notices.
 export const mockAnnouncements = [
@@ -68,23 +62,20 @@ export const mockAnnouncements = [
     id: 'a1',
     title: 'Open House',
     detail: 'Saturday, 8:00 AM – 1:00 PM. All families welcome.',
-    icon: 'megaphone-outline',
     date: 'This Saturday',
   },
   {
     id: 'a2',
     title: 'Parent Orientation — 2026/27',
     detail: 'Orientation for the upcoming academic year.',
-    icon: 'people-outline',
     date: 'Next week',
   },
   {
     id: 'a3',
     title: 'Reminder: The Best Days of the Year',
     detail: 'Special reminder after Maghrib in the main hall.',
-    icon: 'moon-outline',
     date: 'Friday',
   },
 ];
 
-export default { mockTeacher, mockCourses, mockPrayerTimes, mockAnnouncements };
+export default { mockTeacher, mockCourses, mockAnnouncements };

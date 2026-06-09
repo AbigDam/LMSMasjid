@@ -34,7 +34,11 @@ class Audit_Log(models.Model):
 class Class(models.Model):
     class_id = models.BigAutoField(primary_key=True)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="teacher")
-    class_name = models.CharField(max_length=255)
+    class_name = models.CharField(max_length=255, blank=True, null=True)
+    prorgram = models.CharField(max_length=255, blank=True, null=True)
+    schedule = models.CharField(max_length=255, blank=True, null=True)
+    room = models.CharField(max_length=255, blank=True, null=True)
+    status = models.BooleanField(default = True)
     #schedule_days = models.CharField(max_length=255)
     #start_time = models.TimeField()
     #end_time = models.TimeField()
@@ -92,4 +96,10 @@ class Report_Card(models.Model):
     memorization_score = models.IntegerField()  #Out of 5
     attendance_score = models.IntegerField()  #Out of 5
     trimester = models.IntegerField() #Out of 3
+    date = models.DateField()
+
+class Announcement(models.Model):
+    announcement_id = models.BigAutoField(primary_key=True)
+    title = models.CharField(max_length=255)
+    detail = models.CharField(max_length=1000)
     date = models.DateField()

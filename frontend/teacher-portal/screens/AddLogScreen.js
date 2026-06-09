@@ -135,7 +135,7 @@ function StudentChip({ student, logs, selected, onPress }) {
 }
 
 /** Compact read-only view of a log entry */
-function LogDetailView({ log, onEdit }) {
+function LogDetailView({ log, onEdit, viewHistory }) {
   const isAbsent = log.attendance === 'Absent' || log.attendance === 'Excused Absence';
   return (
     <View>
@@ -180,6 +180,10 @@ function LogDetailView({ log, onEdit }) {
       <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
         <Ionicons name="pencil-outline" size={15} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
         <Text style={styles.editBtnText}>Edit Log</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.viewHistoryBtn} onPress={viewHistory}>
+        <Ionicons name="time-outline" size={17} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
+        <Text style={styles.viewHistoryBtnText}>View Log History</Text>
       </TouchableOpacity>
     </View>
   );
@@ -227,6 +231,7 @@ export default function AddLogScreen({ navigation, route }) {
 
   const [selectedId,   setSelectedId]   = useState(MOCK_STUDENTS[0].id);
   const [isEditing,    setIsEditing]     = useState(false);
+  const [viewingHistory, setViewingHistory] = useState(false);
   const [reportExpanded, setReportExpanded] = useState(false);
 
   const selectedStudent = MOCK_STUDENTS.find(s => s.id === selectedId);
@@ -240,6 +245,7 @@ export default function AddLogScreen({ navigation, route }) {
   function handleSelectStudent(id) {
     setSelectedId(id);
     setIsEditing(false);   // reset edit state when switching students
+    setViewingHistory(false);
     setReportExpanded(false);
   }
 
@@ -251,6 +257,7 @@ export default function AddLogScreen({ navigation, route }) {
       [selectedId]: [entry, ...(prev[selectedId] ?? [])],
     }));
     setIsEditing(false);
+    setViewingHistory(false);
   }
 
   function handleUpdateLog(updatedFields) {
@@ -262,9 +269,13 @@ export default function AddLogScreen({ navigation, route }) {
       ),
     }));
     setIsEditing(false);
+    setViewingHistory(false);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  const { course } = route.params;
+
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
 
@@ -294,6 +305,10 @@ export default function AddLogScreen({ navigation, route }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+
+      <View>
+        <Text style={styles.h2}>{course.title}</Text>
+      </View>
 
         {/* ── SECTION 1: Student roster ── */}
         <View style={styles.sectionHeader}>
@@ -352,6 +367,7 @@ export default function AddLogScreen({ navigation, route }) {
             <LogDetailView
               log={todayLog}
               onEdit={() => setIsEditing(true)}
+              viewHistory={() => setViewingHistory(true)}
             />
           )}
         </View>
@@ -380,6 +396,77 @@ export default function AddLogScreen({ navigation, route }) {
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+      
+      {/* Log history modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={viewingHistory}
+        onRequestClose={() => setViewingHistory(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Log History</Text>
+                <Text style={styles.modalSub}>{selectedStudent?.name}</Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setViewingHistory(false)}
+                style={styles.closeModalBtn}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Body (Scrollable History List) */}
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: spacing.xl }}
+            >
+              {studentLogs.length === 0 ? (
+                <Text style={styles.emptyHistoryText}>No logs found for this student.</Text>
+              ) : (
+                studentLogs.map((log) => (
+                  <View key={log.id} style={styles.historyCard}>
+                    <View style={styles.historyCardHeader}>
+                      <Text style={styles.historyDate}>{log.date}</Text>
+                      <View style={[
+                        styles.historyBadge, 
+                        { backgroundColor: log.grade === 'pass' ? colors.successBg : colors.dangerBg }
+                      ]}>
+                        <Text style={[
+                          styles.historyBadgeText, 
+                          { color: log.grade === 'pass' ? colors.success : colors.danger }
+                        ]}>
+                          {log.attendance === 'Absent' ? 'ABSENT' : log.grade?.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {log.attendance !== 'Absent' && (
+                      <View style={styles.historyCardBody}>
+                        <Text style={styles.historyMainText}>
+                          {log.surahName} · Ayahs {log.ayahStart}–{log.ayahEnd}
+                        </Text>
+                        <Text style={styles.historySubText}>
+                          Type: {log.type.charAt(0).toUpperCase() + log.type.slice(1)} | Behavior: {log.behavior}/5
+                        </Text>
+                        {log.assignments ? (
+                          <View style={styles.historyNotesBox}>
+                            <Text style={styles.historyNotesText}>{log.assignments}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -588,6 +675,20 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radii.lg,
   },
+  viewHistoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    marginTop: spacing.sm,
+  },
+  viewHistoryBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: fonts.sizes.body,
+    fontWeight: '700',
+  },
   editBtnText: {
     color: colors.textOnPrimary,
     fontSize: fonts.sizes.body,
@@ -622,5 +723,100 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
+  },
+  //history modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    height: '80%',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.md,
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    fontSize: fonts.sizes.title,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  modalSub: {
+    fontSize: fonts.sizes.body,
+    color: colors.textMuted,
+  },
+  closeModalBtn: {
+    padding: spacing.xs,
+  },
+  emptyHistoryText: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: fonts.sizes.body,
+    marginTop: spacing.xl,
+  },
+  historyCard: {
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  historyCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  historyDate: {
+    fontSize: fonts.sizes.body,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  historyBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  historyBadgeText: {
+    fontSize: fonts.sizes.caption,
+    fontWeight: '700',
+  },
+  historyCardBody: {
+    marginTop: spacing.xs,
+  },
+  historyMainText: {
+    fontSize: fonts.sizes.body,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  historySubText: {
+    fontSize: fonts.sizes.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  historyNotesBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  historyNotesText: {
+    fontSize: fonts.sizes.caption,
+    color: colors.text,
+    lineHeight: 16,
   },
 });

@@ -7,6 +7,7 @@ from .models import *
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import ListAPIView
 
 User = get_user_model()
 
@@ -18,9 +19,6 @@ def test(request):
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
-#Log Out
-### Far Future: Change Password
-
 # Create Classroom
 class CreateClassView(generics.CreateAPIView):
     serializer_class = CreateClassSerializer
@@ -28,11 +26,27 @@ class CreateClassView(generics.CreateAPIView):
 # Return all Classes of a Teacher
 class FilterClasses(APIView):
     def get(self, request):
-        teacher_name = self.request.query_params.get("teacher_name")
+        permission_classes = [IsAuthenticated]
+
+        teacher_name = request.user.username
         classes = Class.objects.filter(teacher = Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name)))
         serializer  = ClassSerializer(classes, many=True)
         return Response(serializer.data)
 
+class CurrentUser(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "email": request.user.email,
+            "username": request.user.username,
+        })
+
+class AnnouncementListView(ListAPIView):
+    queryset = Announcement.objects.all().order_by("-date")
+    serializer_class = AnnouncementSerializer
 
 # Create Account Student 
 # Add Student to Classroom

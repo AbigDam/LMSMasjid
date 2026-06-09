@@ -1,6 +1,6 @@
 // screens/SignupScreen.js
 // -----------------------------------------------------------------------------
-// Al-Hidaya teacher sign-up (Phase I — MOCK only, no backend).
+// Al-Hidaya teacher sign-up (Phase II - Backend Integration).
 //
 // Behaviour:
 //   - Full name, email, password, confirm password
@@ -26,62 +26,130 @@ import TextField from '../components/TextField';
 import PasswordStrength from '../components/PasswordStrength';
 import { isValidEmail, validatePassword } from '../constants/validation';
 import { colors, spacing, radii, fonts, shadow } from '../constants/theme';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
 
 export default function SignupScreen({ navigation }) {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState({});
 
-  function validate(trimmedName, trimmedEmail) {
-    const next = {};
-    if (!trimmedName) next.name = 'Full name is required.';
-    if (!trimmedEmail) {
-      next.email = 'Email is required.';
-    } else if (!isValidEmail(trimmedEmail)) {
-      next.email = 'Enter a valid email address.';
-    }
-    const pwError = validatePassword(password);
-    if (pwError) next.password = pwError;
-    if (!confirm) {
-      next.confirm = 'Please confirm your password.';
-    } else if (confirm !== password) {
-      next.confirm = 'Passwords do not match.';
-    }
-    return next;
+function validate(trimmedFirstName, trimmedLastName, trimmedEmail) {
+  const next = {};
+
+  if (!trimmedFirstName) {
+    next.firstName = 'First name is required.';
   }
 
-  function handleSignup() {
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim(); // always trim email
-    const validationErrors = validate(trimmedName, trimmedEmail);
-    setErrors(validationErrors);
-    if (Object.keys(validationErrors).length > 0) return;
-
-    // TODO (Django auth): replace this mock with a real registration call, e.g.
-    //   POST `${API_URL}/api/auth/register/` with { name, email, password };
-    //   handle "email already in use", then store the returned token securely.
-    //
-    // Phase I: a valid form "registers" and goes straight to the dashboard.
-    navigation.replace('Dashboard');
+  if (!trimmedLastName) {
+    next.lastName = 'Last name is required.';
   }
+
+  if (!trimmedEmail) {
+    next.email = 'Email is required.';
+  } else if (!isValidEmail(trimmedEmail)) {
+    next.email = 'Enter a valid email address.';
+  }
+
+  const pwError = validatePassword(password);
+
+  if (pwError) {
+    next.password = pwError;
+  }
+
+  if (!confirm) {
+    next.confirm = 'Please confirm your password.';
+  } else if (confirm !== password) {
+    next.confirm = 'Passwords do not match.';
+  }
+
+  return next;
+}
+const API_URL = 'http://127.0.0.1:8000/';
+
+const { setAuthenticated } = useAuth();
+
+async function handleSignup() {
+  const trimmedFirstName = firstName.trim();
+  const trimmedLastName = lastName.trim();
+  const trimmedEmail = email.trim();
+
+  const validationErrors = validate(
+    trimmedFirstName,
+    trimmedLastName,
+    trimmedEmail
+  );
+
+  setErrors(validationErrors);
+
+  if (Object.keys(validationErrors).length > 0) {
+    return;
+  }
+
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/register/`,
+      {
+        first_name: trimmedFirstName,
+        last_name: trimmedLastName,
+        email: trimmedEmail,
+        password,
+        role: 'Teacher',
+      }
+    );
+
+    const accessToken = response.data.access;
+
+    await AsyncStorage.setItem('authToken', accessToken);
+
+    // 🔥 THIS replaces navigation
+    setAuthenticated(true);
+
+  } catch (error) {
+    console.error(error);
+
+    const data = error?.response?.data;
+
+    setErrors({
+      email:
+        data?.email ||
+        data?.error ||
+        data?.message ||
+        'Registration failed.',
+    });
+  }
+}
 
   return (
     <AuthScene>
       <Text style={styles.welcome}>Create your account</Text>
       <Text style={styles.welcomeSub}>Join the Al-Hidaya teaching team</Text>
 
-      <TextField
-        label="Full name"
-        iconName="person-outline"
-        value={name}
-        onChangeText={setName}
-        placeholder="e.g. Ustadh Ahmad"
-        error={errors.name}
-        autoCapitalize="words"
-        returnKeyType="next"
-      />
+    <TextField
+      label="First Name"
+      iconName="person-outline"
+      value={firstName}
+      onChangeText={setFirstName}
+      placeholder="Ahmad"
+      error={errors.firstName}
+      autoCapitalize="words"
+      returnKeyType="next"
+    />
+
+    <TextField
+      label="Last Name"
+      iconName="person-outline"
+      value={lastName}
+      onChangeText={setLastName}
+      placeholder="Khan"
+      error={errors.lastName}
+      autoCapitalize="words"
+      returnKeyType="next"
+    />
 
       <TextField
         label="Email"

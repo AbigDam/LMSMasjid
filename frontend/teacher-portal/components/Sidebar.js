@@ -21,7 +21,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { brand, brandImages } from '../constants/brand';
 import { colors, spacing, radii, fonts } from '../constants/theme';
 
-const SIDEBAR_WIDTH = 224;
+const SIDEBAR_WIDTH = 290;
 
 export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut, onClose }) {
   return (
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   brandSub: { color: colors.sidebarText, fontSize: fonts.sizes.caption, marginTop: 1 },
   sectionLabel: {
     color: colors.sidebarText,
-    fontSize: 11,
+    fontSize: fonts.sizes.body,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,

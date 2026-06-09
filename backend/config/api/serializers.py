@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import *
+from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -39,8 +41,50 @@ class CreateClassSerializer(serializers.Serializer):
 
         return classroom
 
-## Temporary Serializer, We will need to add more things
 class ClassSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source="class_id", read_only=True)
+    title = serializers.CharField(source="class_name", read_only=True)
+    program = serializers.CharField(source="prorgram", read_only=True)
+
+    students = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = Class
-        fields = "__all__"
+        fields = [
+            "id",
+            "title",
+            "program",
+            "students",
+            "schedule",
+            "room",
+            "status",
+        ]
+
+    def get_students(self, obj):
+        return obj.students.count()
+
+    def get_status(self, obj):
+        return "active" if obj.status else "inactive"
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source="announcement_id", read_only=True)
+    date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Announcement
+        fields = ["id", "title", "detail", "date"]
+
+    def get_date(self, obj):
+        today = timezone.now().date()
+        delta = (obj.date - today).days
+
+        if delta == 0:
+            return "Today"
+        elif delta == 1:
+            return "Tomorrow"
+        elif 1 < delta <= 7:
+            return obj.date.strftime("%A")  # e.g. "Saturday"
+        else:
+            return obj.date.strftime("%b %d, %Y")  # fallback: "Jun 14, 2026"
