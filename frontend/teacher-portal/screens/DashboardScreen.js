@@ -13,9 +13,13 @@
 // hidden behind the drawer on mobile.
 //
 // Works on iOS, Android, and Web.
+// screens/DashboardScreen.js
+// -----------------------------------------------------------------------------
+// Al-Hidaya Teacher Dashboard — Bronze & White Style 
+// (Expanded Toggleable Sidebar, Wide Cards & Large Typography)
 // -----------------------------------------------------------------------------
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -23,8 +27,10 @@ import {
   Pressable,
   ScrollView,
   Animated,
+  Easing,
   useWindowDimensions,
   StyleSheet,
+  TurboModuleRegistry,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -38,32 +44,33 @@ import {
   mockAnnouncements,
 } from '../data/mockData';
 import { brand, brandImages } from '../constants/brand';
-import { colors, spacing, radii, fonts, shadow } from '../constants/theme';
 
 const WIDE_BREAKPOINT = 900;
-const DRAWER_WIDTH = 224; // matches the Sidebar's own width
+// Increased sidebar width to accommodate slightly bigger layout and larger font sizes
+const DRAWER_WIDTH = 290; 
 
-// Quick-stat tile. Two layouts:
-//   - desktop: roomy horizontal card (icon beside value)
-//   - mobile (compact): tight vertical card so all 3 fit in one row
-function StatCard({ icon, value, label, compact }) {
-  if (compact) {
-    return (
-      <View style={styles.statCardCompact}>
-        <MaterialCommunityIcons name={icon} size={18} color={colors.primary} />
-        <Text style={styles.statValueCompact} numberOfLines={1}>{value}</Text>
-        <Text style={styles.statLabelCompact} numberOfLines={1}>{label}</Text>
-      </View>
-    );
-  }
+const BRONZE_COLORS = {
+  bronzeDeep: '#3E3122',    // Deep majestic bronze
+  bronzeBright: '#B45309',  // Vibrant focus bronze
+  bronzeAccent: '#9A6A3C',  // Warm gold/bronze trim accent
+  bgCanvas: '#FAF9F6',      // Alabaster soft white canvas
+  surfaceWhite: '#FFFFFF',  // Clean surface card
+  textDark: '#111827',      // Ultra-readable deep charcoal
+  textMuted: '#4B5563',     // Secondary body text
+  borderLight: '#E5E7EB',   // Subtle dividers
+  badgeBg: '#FEF3C7',       // Soft bronze tint badge background
+  badgeText: '#92400E',     // Dark bronze badge text
+};
+
+function LargeStatCard({ icon, value, label }) {
   return (
-    <View style={styles.statCard}>
-      <View style={styles.statIcon}>
-        <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />
+    <View style={styles.largeStatCard}>
+      <View style={styles.statIconBadge}>
+        <MaterialCommunityIcons name={icon} size={32} color={BRONZE_COLORS.bronzeDeep} />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+      <View style={styles.statTextGroup}>
+        <Text style={styles.largeStatValue}>{value}</Text>
+        <Text style={styles.largeStatLabel}>{label}</Text>
       </View>
     </View>
   );
@@ -73,212 +80,184 @@ export default function DashboardScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const isWide = width >= WIDE_BREAKPOINT;
 
-  // Mobile drawer state + slide/fade animation.
+  // New toggle state for controlling desktop sidebar presentation 
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isWide) return; // no drawer animation needed on desktop
+    if (isWide) return;
     Animated.parallel([
       Animated.timing(translateX, {
         toValue: menuOpen ? 0 : -DRAWER_WIDTH,
-        duration: 220,
+        duration: 250,
+        easing: Animated.Easing.bezier(0.4, 0, 0.2, 1),
         useNativeDriver: true,
       }),
       Animated.timing(backdrop, {
         toValue: menuOpen ? 1 : 0,
-        duration: 220,
+        duration: 250,
+        easing: Animated.Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: menuOpen ? 1 : 0,
+        duration: 250,
+        easing: Animated.Easing.bezier(0.4, 0, 0.2, 1),
         useNativeDriver: true,
       }),
     ]).start();
   }, [menuOpen, isWide, translateX, backdrop]);
 
-  // Close the drawer whenever we switch to the wide layout.
   useEffect(() => {
     if (isWide) setMenuOpen(false);
   }, [isWide]);
 
-  // Derived mock stats.
   const totalStudents = mockCourses.reduce((sum, c) => sum + c.students, 0);
   const classCount = mockCourses.length;
   const nextClass = mockCourses[0];
 
   function handleSignOut() {
-    // TODO (Django auth): clear the stored token (SecureStore) before leaving.
     navigation.replace('Login');
   }
 
   function handleNavigateClass(course) {
-    navigation.navigate('AddLog', { course }); 
+    navigation.navigate('AddLog', { course });
     setMenuOpen(false);
   }
-
-  function handleViewDetails(course) {
-    // Placeholder — Course Details page is out of scope for FE-1.
-    navigation.navigate('AddLog', { course }); 
-    setMenuOpen(false);
-  }
-
-  // Prayer strip is shared; on desktop it sits above My Courses, on mobile it
-  // moves BELOW My Courses so course cards are visible sooner (less scrolling).
-  const prayerBlock = (
-    <View style={styles.prayerStrip}>
-      <View style={styles.prayerHeader}>
-        <MaterialCommunityIcons name="mosque" size={16} color={colors.primary} />
-        <Text style={styles.prayerHeaderText}>Today's Iqama Times</Text>
-      </View>
-      <View style={styles.prayerItems}>
-        {mockPrayerTimes.map((p) => (
-          <View key={p.name} style={styles.prayerItem}>
-            <Text style={styles.prayerName}>{p.name}</Text>
-            <Text style={styles.prayerTime}>{p.iqama}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
-      <View style={styles.row}>
-        {/* Persistent sidebar — desktop / tablet only */}
-        {isWide ? (
-          <Sidebar
-            courses={mockCourses}
-            activeId={mockCourses[0]?.id}
-            onNavigate={handleNavigateClass}
-            onSignOut={handleSignOut}
-          />
-        ) : null}
+      {/* Top Header Bar */}
+      <View style={styles.hubHeader}>
+        <View style={styles.headerLeft}>
+          {isWide ? (
+            // Desktop Sidebar Toggle button
+            <Pressable 
+              onPress={() => setSidebarVisible(!sidebarVisible)} 
+              style={styles.menuIconButton} 
+              hitSlop={12}
+            >
+              <Ionicons name={sidebarVisible ? "menu-fold" : "menu"} size={28} color="#9A6A3C" />
+            </Pressable>
+          ) : (
+            // Mobile Hamburger Drawer button
+            <Pressable 
+              onPress={() => setMenuOpen(true)} 
+              style={styles.menuIconButton} 
+              hitSlop={12}
+            >
+              <Ionicons name="menu" size={32} color="#9A6A3C" />
+            </Pressable>
+          )}
+          <Image source={brandImages.logo} style={styles.hubLogo} resizeMode="contain" />
+          <Text style={styles.hubTitle}>{brand.name}</Text>
+        </View>
 
-        {/* Main content */}
-        <View style={styles.main}>
-          {/* Mobile top bar with hamburger */}
-          {!isWide ? (
-            <View style={styles.topBar}>
-              <Pressable
-                onPress={() => setMenuOpen(true)}
-                hitSlop={8}
-                style={styles.menuBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Open menu"
-              >
-                <Ionicons name="menu" size={26} color={colors.text} />
-              </Pressable>
-              <Image source={brandImages.logo} style={styles.topLogo} resizeMode="contain" />
-              <Text style={styles.topBarTitle}>{brand.shortName}</Text>
-            </View>
-          ) : null}
-
-          <ScrollView contentContainerStyle={[styles.scroll, !isWide && styles.scrollCompact]}>
-            {/* Greeting header */}
-            <View style={styles.headerCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.salaam}>Assalamu 'alaikum, {mockTeacher.name}</Text>
-                <Text style={styles.headerSub}>{brand.name} · Dashboard</Text>
-              </View>
-              <View style={styles.headerBadge}>
-                <Ionicons name="school-outline" size={16} color={colors.primaryDark} />
-                <Text style={styles.headerBadgeText}>{brand.portal}</Text>
-              </View>
-            </View>
-
-            {/* Quick stats — compact single row of 3 on mobile */}
-            <View style={[styles.statsRow, !isWide && styles.statsRowCompact]}>
-              <StatCard
-                compact={!isWide}
-                icon="account-group-outline"
-                value={totalStudents}
-                label={isWide ? 'Total students' : 'Students'}
-              />
-              <StatCard
-                compact={!isWide}
-                icon="book-open-page-variant-outline"
-                value={classCount}
-                label={isWide ? 'Active classes' : 'Classes'}
-              />
-              <StatCard
-                compact={!isWide}
-                icon="clock-outline"
-                value={nextClass?.schedule?.split(' - ')[0] ?? '—'}
-                label={isWide ? `Next: ${nextClass?.title ?? ''}` : 'Next class'}
-              />
-            </View>
-
-            {/* Desktop: prayer times above courses */}
-            {isWide ? prayerBlock : null}
-
-            {/* My Courses */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.h2}>My Courses</Text>
-              <Text style={styles.subtext}>Manage and track your teaching courses</Text>
-            </View>
-            <View style={styles.cardGrid}>
-              {mockCourses.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  onViewDetails={() => handleViewDetails(course)}
-                />
-              ))}
-            </View>
-
-            {/* Mobile: prayer times below courses (courses get priority) */}
-            {!isWide ? prayerBlock : null}
-
-            {/* Announcements */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.h2}>Community Announcements</Text>
-              <Text style={styles.subtext}>Latest from {brand.name}</Text>
-            </View>
-            <View style={styles.announceList}>
-              {mockAnnouncements.map((a) => (
-                <View key={a.id} style={styles.announceCard}>
-                  <View style={styles.announceIcon}>
-                    <Ionicons name={a.icon} size={20} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.announceTop}>
-                      <Text style={styles.announceTitle}>{a.title}</Text>
-                      <Text style={styles.announceDate}>{a.date}</Text>
-                    </View>
-                    <Text style={styles.announceDetail}>{a.detail}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            {/* Contact footer */}
-            <View style={styles.footer}>
-              <View style={styles.footerRow}>
-                <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-                <Text style={styles.footerText}>{brand.address}</Text>
-              </View>
-              <View style={styles.footerRow}>
-                <Ionicons name="call-outline" size={14} color={colors.textMuted} />
-                <Text style={styles.footerText}>{brand.phone}</Text>
-                <Ionicons name="mail-outline" size={14} color={colors.textMuted} style={{ marginLeft: spacing.md }} />
-                <Text style={styles.footerText}>{brand.email}</Text>
-              </View>
-            </View>
-          </ScrollView>
+        <View style={styles.headerRight}>
+          <View style={styles.teacherBadgeContainer}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.teacherBadgeText}>{mockTeacher.name}</Text>
+          </View>
+          <Pressable onPress={handleSignOut} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={26} color="#FFFFFF" />
+          </Pressable>
         </View>
       </View>
 
-      {/* Mobile slide-out drawer overlay */}
-      {!isWide ? (
-        <View
-          style={StyleSheet.absoluteFill}
-          pointerEvents={menuOpen ? 'auto' : 'none'}
-        >
-          {/* Dim backdrop — tap outside to close */}
-          <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
+      <View style={styles.mainLayout}>
+        {/* Desktop Sidebar (Render conditionally based on state logic) */}
+        {isWide && sidebarVisible && (
+          <View style={styles.desktopNavWrapper}>
+            <Sidebar
+              courses={mockCourses}
+              activeId={mockCourses[0]?.id}
+              onNavigate={handleNavigateClass}
+              onSignOut={handleSignOut}
+              onClose={() => setSidebarVisible(false)}
+            />
+          </View>
+        )}
+
+        {/* Content Stream View */}
+        <ScrollView contentContainerStyle={styles.scrollCanvas} showsVerticalScrollIndicator={false}>
+          
+          {/* Welcome Banner Box */}
+          <View style={styles.hubWelcomeBanner}>
+            <Text style={styles.hubGreeting}>{mockTeacher.name}</Text>
+            <Text style={styles.hubSubGreeting}>Al-Hidaya Teacher Portal Dashboard — Manage your active classes and student logs.</Text>
+          </View>
+
+          {/* Large High-Visibility Metrics */}
+          <View style={styles.metricsContainerGrid}>
+            <LargeStatCard icon="account-multiple" value={totalStudents} label="Enrolled Students" />
+            <LargeStatCard icon="school" value={classCount} label="Active Class Sections" />
+            <LargeStatCard icon="clock-start" value={nextClass?.schedule?.split(' - ')[0] ?? '—'} label="Next Session" />
+          </View>
+
+          {/* Central Section Grid Layout */}
+          <View style={styles.hubContentSplit}>
+            
+            {/* Primary Left/Center Column: Widened Course Cards */}
+            <View style={styles.coursesMainSection}>
+              <View style={styles.hubSectionHeader}>
+                <View style={styles.sectionTitleIndicator} />
+                <Text style={styles.hubSectionTitleText}>Your Teaching Courses</Text>
+              </View>
+
+              <View style={styles.largeCardGrid}>
+                {mockCourses.map((course) => (
+                  <View key={course.id} style={styles.courseCardContainerOverride}>
+                    <CourseCard
+                      course={course}
+                      onViewDetails={() => navigation.navigate('AddLog', { course })}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Utility Sidebar Column */}
+            <View style={styles.utilitiesSideSection}>
+
+              
+
+
+              {/* Administrative Notice Board Box */}
+              <View style={styles.hubUtilityWidget}>
+                <View style={styles.widgetHeaderRow}>
+                  <MaterialCommunityIcons name="bullhorn" size={26} color={BRONZE_COLORS.bronzeAccent} />
+                  <Text style={styles.widgetHeadingText}>Notice Board</Text>
+                </View>
+                <View style={styles.announcementsListContainer}>
+                  {mockAnnouncements.map((a) => (
+                    <View key={a.id} style={styles.largeNoticeItemBlock}>
+                      <View style={styles.noticeMetaRow}>
+                        <Text style={styles.noticeDateLabel}>{a.date}</Text>
+                      </View>
+                      <Text style={styles.noticeTitleLabelText}>{a.title}</Text>
+                      <Text style={styles.noticeDetailBodyText}>{a.detail}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+            </View>
+
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* Slide-out Mobile Drawer */}
+      {!isWide && (
+        <View style={StyleSheet.absoluteFill} pointerEvents={menuOpen ? 'auto' : 'none'}>
+          <Animated.View style={[styles.mobileBackdropLayer, { opacity: backdrop }]}>
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
           </Animated.View>
 
-          {/* The drawer itself slides in from the left */}
-          <Animated.View style={[styles.drawer, { transform: [{ translateX }] }]}>
+          <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
             <Sidebar
               courses={mockCourses}
               activeId={mockCourses[0]?.id}
@@ -288,193 +267,104 @@ export default function DashboardScreen({ navigation }) {
             />
           </Animated.View>
         </View>
-      ) : null}
-
-            <Pressable onPress={() => navigation.navigate('AddLog')}>
-      <Text style={{ color: 'red' }}>Backend Debug</Text>
-    </Pressable>
-
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  row: { flex: 1, flexDirection: 'row' },
-  main: { flex: 1 },
-
-  // Mobile top bar
-  topBar: {
+  safe: { flex: 1, backgroundColor: BRONZE_COLORS.bronzeAccent },
+  mainLayout: { flex: 1, flexDirection: 'row', backgroundColor: BRONZE_COLORS.bgCanvas },
+  desktopNavWrapper: { width: DRAWER_WIDTH, backgroundColor: '#ffffff', borderRightWidth: 1, borderRightColor: BRONZE_COLORS.borderLight },
+  
+  hubHeader: {
+    height: 76,
+    backgroundColor: BRONZE_COLORS.surfaceWhite,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    borderBottomWidth: 4,
+    borderBottomColor: BRONZE_COLORS.bronzeAccent,
   },
-  menuBtn: { padding: spacing.xs },
-  topLogo: { width: 28, height: 26, marginLeft: spacing.xs },
-  topBarTitle: { fontSize: fonts.sizes.subtitle, fontWeight: '800', color: colors.text },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  menuIconButton: { padding: 4, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
+  hubLogo: { width: 92, height: 92, borderRadius: 12 },
+  hubTitle: { fontSize: 24, fontWeight: '700', color: BRONZE_COLORS.textDark, letterSpacing: 0.3 },
+  
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  teacherBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(243, 133, 6, 0.18)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, gap: 10 },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#01885b' },
+  teacherBadgeText: { color: '#0f0f0f', fontSize: 16, fontWeight: '600' },
+  logoutButton: { padding: 8, backgroundColor: 'rgb(221, 5, 5)', borderRadius: 8 },
 
-  scroll: {
-    padding: spacing.xl,
-    maxWidth: 1100, // keeps content readable on big monitors
-    width: '100%',
-    alignSelf: 'center',
-  },
-  scrollCompact: { padding: spacing.lg }, // tighter page padding on mobile
+  scrollCanvas: { padding: 32, maxWidth: 1600, width: '100%', alignSelf: 'center' },
 
-  // Header
-  headerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    ...shadow,
-  },
-  salaam: { fontSize: fonts.sizes.heading, fontWeight: '800', color: colors.text },
-  headerSub: { fontSize: fonts.sizes.body, color: colors.textMuted, marginTop: spacing.xs },
-  headerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-  },
-  headerBadgeText: { color: colors.primaryDark, fontWeight: '700', fontSize: fonts.sizes.caption },
-
-  // Stats (desktop)
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: 180,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+  hubWelcomeBanner: {
+    backgroundColor: BRONZE_COLORS.surfaceWhite,
+    borderRadius: 14,
+    padding: 32,
+    borderLeftWidth: 8,
+    borderLeftColor: BRONZE_COLORS.bronzeAccent,
+    marginBottom: 32,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
+    borderColor: BRONZE_COLORS.borderLight,
   },
-  statIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.md,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statValue: { fontSize: fonts.sizes.title, fontWeight: '800', color: colors.text },
-  statLabel: { fontSize: fonts.sizes.caption, color: colors.textMuted },
+  hubGreeting: { fontSize: 32, fontWeight: '800', color: BRONZE_COLORS.textDark },
+  hubSubGreeting: { fontSize: 18, color: BRONZE_COLORS.textMuted, marginTop: 8, lineHeight: 26 },
 
-  // Stats (mobile compact) — 3 tight columns in one row
-  statsRowCompact: { flexWrap: 'nowrap', gap: spacing.sm },
-  statCardCompact: {
+  metricsContainerGrid: { flexDirection: 'row', gap: 24, flexWrap: 'wrap', marginBottom: 36 },
+  largeStatCard: {
     flex: 1,
-    flexBasis: 0,
-    minWidth: 0, // lets numberOfLines truncate instead of overflowing
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'flex-start',
-    gap: 2,
-  },
-  statValueCompact: { fontSize: fonts.sizes.subtitle, fontWeight: '800', color: colors.text },
-  statLabelCompact: { fontSize: 11, color: colors.textMuted },
-
-  // Prayer strip
-  prayerStrip: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.lg,
-  },
-  prayerHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-  prayerHeaderText: {
-    fontSize: fonts.sizes.caption,
-    fontWeight: '700',
-    color: colors.text,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  prayerItems: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.md },
-  prayerItem: {
-    alignItems: 'center',
-    flexGrow: 1,
-    minWidth: 56,
-    backgroundColor: colors.primaryLight,
-    borderRadius: radii.md,
-    paddingVertical: spacing.sm,
-  },
-  prayerName: { fontSize: fonts.sizes.caption, color: colors.primaryDark, fontWeight: '600' },
-  prayerTime: { fontSize: fonts.sizes.body, color: colors.text, fontWeight: '800', marginTop: 2 },
-
-  // Sections
-  sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.lg },
-  h2: { fontSize: fonts.sizes.title, fontWeight: '800', color: colors.text },
-  subtext: { fontSize: fonts.sizes.body, color: colors.textMuted, marginTop: spacing.xs },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
-
-  // Announcements
-  announceList: { gap: spacing.md },
-  announceCard: {
+    minWidth: 280,
+    backgroundColor: BRONZE_COLORS.surfaceWhite,
+    borderRadius: 14,
+    padding: 28,
     flexDirection: 'row',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-    padding: spacing.lg,
-  },
-  announceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 24,
+    borderWidth: 1,
+    borderColor: BRONZE_COLORS.borderLight,
   },
-  announceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
-  announceTitle: { fontSize: fonts.sizes.subtitle, fontWeight: '700', color: colors.text, flex: 1 },
-  announceDate: { fontSize: fonts.sizes.caption, color: colors.primary, fontWeight: '700' },
-  announceDetail: { fontSize: fonts.sizes.body, color: colors.textMuted, marginTop: 2 },
+  statIconBadge: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
+  statTextGroup: { flex: 1 },
+  largeStatValue: { fontSize: 34, fontWeight: '800', color: BRONZE_COLORS.textDark, letterSpacing: -0.5 },
+  largeStatLabel: { fontSize: 16, fontWeight: '600', color: BRONZE_COLORS.textMuted, marginTop: 4 },
 
-  // Footer
-  footer: {
-    marginTop: spacing.xl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: spacing.sm,
-  },
-  footerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
-  footerText: { fontSize: fonts.sizes.caption, color: colors.textMuted },
+  hubContentSplit: { flexDirection: 'row', gap: 32, flexWrap: 'wrap' },
+  coursesMainSection: { flex: 4, minWidth: 450 }, 
+  utilitiesSideSection: { flex: 1.5, minWidth: 320, gap: 32 },
 
-  // Mobile drawer overlay
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(20, 14, 8, 0.55)',
+  hubSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
+  sectionTitleIndicator: { width: 6, height: 28, backgroundColor: BRONZE_COLORS.bronzeBright, borderRadius: 3 },
+  hubSectionTitleText: { fontSize: 22, fontWeight: '700', color: BRONZE_COLORS.textDark },
+
+  largeCardGrid: { gap: 20 },
+  courseCardContainerOverride: { width: '100%' }, 
+
+  hubUtilityWidget: {
+    backgroundColor: BRONZE_COLORS.surfaceWhite,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRONZE_COLORS.borderLight,
+    padding: 24,
   },
-  drawer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: DRAWER_WIDTH,
-    ...shadow,
-  },
+  widgetHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: BRONZE_COLORS.borderLight, paddingBottom: 12 },
+  widgetHeadingText: { fontSize: 18, fontWeight: '700', color: BRONZE_COLORS.textDark },
+
+  prayerTimeTableList: { gap: 14 },
+  prayerRowItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  prayerLabelNameText: { fontSize: 16, fontWeight: '600', color: BRONZE_COLORS.textDark },
+  prayerTimePillBadge: { backgroundColor: BRONZE_COLORS.bronzeDeep, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  prayerTimeBadgeValueText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+
+  announcementsListContainer: { gap: 20 },
+  largeNoticeItemBlock: { borderBottomWidth: 1, borderBottomColor: BRONZE_COLORS.borderLight, paddingBottom: 16 },
+  noticeMetaRow: { marginBottom: 6 },
+  noticeDateLabel: { fontSize: 13, color: BRONZE_COLORS.bronzeBright, fontWeight: '700' },
+  noticeTitleLabelText: { fontSize: 17, fontWeight: '700', color: BRONZE_COLORS.textDark },
+  noticeDetailBodyText: { fontSize: 15, color: BRONZE_COLORS.textMuted, marginTop: 6, lineHeight: 22 },
+
+  mobileBackdropLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(120, 53, 15, 0.4)' },
+  mobileDrawerContainer: { position: 'absolute', top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, backgroundColor: '#FFFFFF' },
 });
