@@ -64,10 +64,53 @@ class AnnouncementListView(ListAPIView):
 
 ###  Muwahid Starts here ###
 
-# Log Student Behavior
-# Return Behavior log on Date
-# Return list of dates that aren't 5
+class LogAttendanceView(generics.CreateAPIView):
+    serializer_class = LogAttendanceSerializer
+    permission_classes = [IsAuthenticated]
 
-# Log Student Attendance
-    ## If an attendance log exsists for the previous day, but no behavior log exsists at that day, then make a behavior log for that day
-# Return list of days student was present
+
+class LogBehaviorView(generics.CreateAPIView):
+    serializer_class = LogBehaviorSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class GetBehaviorLogView(APIView):
+    """GET /api/get_behavior_log/?student_id=X&date=YYYY-MM-DD"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        student_id = request.query_params.get("student_id")
+        date = request.query_params.get("date")
+        logs = Behavior_Log.objects.filter(student__student_id=student_id, date=date)
+        serializer = BehaviorLogSerializer(logs, many=True)
+        return Response(serializer.data)
+
+
+class GetBehaviorIssuesView(APIView):
+    """GET /api/get_behavior_issues/?student_id=X  — returns dates where score < 5"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        student_id = request.query_params.get("student_id")
+        dates = (
+            Behavior_Log.objects
+            .filter(student__student_id=student_id, score__lt=5)
+            .values("date", "score", "comments")
+            .order_by("date")
+        )
+        return Response(list(dates))
+
+
+class GetAttendanceView(APIView):
+    """GET /api/get_attendance/?student_id=X  — returns dates the student was present"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        student_id = request.query_params.get("student_id")
+        dates = (
+            Attendance_Log.objects
+            .filter(student__student_id=student_id, present=True)
+            .values_list("date", flat=True)
+            .order_by("date")
+        )
+        return Response(list(dates))
