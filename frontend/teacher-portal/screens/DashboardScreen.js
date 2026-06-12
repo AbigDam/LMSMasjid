@@ -83,35 +83,36 @@ export default function DashboardScreen({ navigation }) {
   
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0)).current;
 
   const [teacher, setTeacher] = useState(null);
   const [courses, setCourses] = useState([]);
   const [announcements, setAnnouncements] = useState([]); 
   const { setAuthenticated } = useAuth();
 
-useEffect(() => {
-  async function loadCourses() {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
+  useEffect(() => {
+    async function loadCourses() {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
 
-      const response = await axios.get(
-        'http://127.0.0.1:8000/api/select_classes/',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+        const response = await axios.get(
+          'http://127.0.0.1:8000/api/select_classes/',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
 
-
-      setCourses(response.data);
-    } catch (error) {
-      console.error(error);
+        setCourses(response.data);
+        
+      } catch (error) {
+        console.error(error);
+      }
     }
-  }
 
-  loadCourses();
-}, []);
+    loadCourses();
+  }, []);
 
 useEffect(() => {
   async function loadUser() {
@@ -126,7 +127,6 @@ useEffect(() => {
           },
         }
       )
-
 
       setTeacher(response.data);
     } catch (error) {
@@ -156,19 +156,19 @@ useEffect(() => {
       Animated.timing(translateX, {
         toValue: menuOpen ? 0 : -DRAWER_WIDTH,
         duration: 250,
-        easing: Animated.Easing.bezier(0.4, 0, 0.2, 1),
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
         useNativeDriver: true,
       }),
       Animated.timing(backdrop, {
         toValue: menuOpen ? 1 : 0,
         duration: 250,
-        easing: Animated.Easing.bezier(0.4, 0, 0.2, 1),
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
         useNativeDriver: true,
       }),
       Animated.timing(scale, {
         toValue: menuOpen ? 1 : 0,
         duration: 250,
-        easing: Animated.Easing.bezier(0.4, 0, 0.2, 1),
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
         useNativeDriver: true,
       }),
     ]).start();
@@ -206,6 +206,7 @@ useEffect(() => {
             >
               <Ionicons name={sidebarVisible ? "menu-fold" : "menu"} size={28} color="#9A6A3C" />
             </Pressable>
+            
           ) : (
             // Mobile Hamburger Drawer button
             <Pressable 
@@ -216,8 +217,14 @@ useEffect(() => {
               <Ionicons name="menu" size={32} color="#9A6A3C" />
             </Pressable>
           )}
-          <Image source={brandImages.logo} style={styles.hubLogo} resizeMode="contain" />
-          <Text style={styles.hubTitle}>{brand.name}</Text>
+          {isWide ? (
+            // Show logo and brand name in header on desktop
+            <>
+              <Image source={brandImages.logo} style={styles.hubLogo} resizeMode="contain" />
+              <Text style={styles.hubTitle}>{brand.name}</Text>
+            </>
+          ) : null}
+          
         </View>
 
         <View style={styles.headerRight}>
@@ -250,7 +257,7 @@ useEffect(() => {
           
           {/* Welcome Banner Box */}
           <View style={styles.hubWelcomeBanner}>
-            <Text style={styles.hubGreeting}>{teacher?.first_name} {teacher?.last_name}</Text>
+            <Text style={styles.hubGreeting}>Teacher {teacher?.first_name}</Text>
             <Text style={styles.hubSubGreeting}>Al-Hidaya Teacher Portal Dashboard — Manage your active classes and student logs.</Text>
           </View>
 
@@ -424,5 +431,5 @@ const styles = StyleSheet.create({
   noticeDetailBodyText: { fontSize: 15, color: BRONZE_COLORS.textMuted, marginTop: 6, lineHeight: 22 },
 
   mobileBackdropLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(120, 53, 15, 0.4)' },
-  mobileDrawerContainer: { position: 'absolute', top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, backgroundColor: '#FFFFFF' },
+  mobileDrawerContainer: { position: 'absolute', top: 62, bottom: 0, left: 0, width: DRAWER_WIDTH, backgroundColor: '#FFFFFF' },
 });

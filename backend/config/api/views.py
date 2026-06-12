@@ -48,10 +48,20 @@ class AnnouncementListView(ListAPIView):
     queryset = Announcement.objects.all().order_by("-date")
     serializer_class = AnnouncementSerializer
 
+### Yousef TODO: Add the following API endpoints:
 # Create Account Student 
 # Add Student to Classroom
 # Remove Student from Classroom
+
 # Return all Students in Class
+class StudentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, class_id):
+        students = Student.objects.filter(classroom__class_id=class_id)
+        serializer = StudentSerializer(students, many=True)
+    
+        return Response(serializer.data)
 
 #Log Functions
 #   CreateLog(student, teacher, surah, starting_ayah, ending_ayah, passed, comments, dates, log_type)

@@ -11,6 +11,7 @@ urlpatterns = [
     path("select_classes/", FilterClasses.as_view(), name="filter_class"),
     path("current_user/", CurrentUser.as_view(), name="current_user"),
     path("announcements/", AnnouncementListView.as_view(), name="announcements"),
+    path("select_students/<int:class_id>/", StudentListView.as_view(), name="student_list"),
 
     # Attendance
     path("log_attendance/", LogAttendanceView.as_view(), name="log_attendance"),
