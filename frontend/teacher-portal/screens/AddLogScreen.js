@@ -18,7 +18,7 @@
 //   - handleUpdateLog → PATCH /api/logs/<id>/
 // -----------------------------------------------------------------------------
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -35,6 +35,8 @@ import { AddLogForm }      from '../components/AddLogForm';
 import { ReportGenerator } from '../components/ReportGenerator';
 import { brand }           from '../constants/brand';
 import { colors, fonts, radii, shadow, spacing } from '../constants/theme';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -87,6 +89,9 @@ const MOCK_LOGS = {
   5: [],
 };
 
+
+
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -117,7 +122,7 @@ function StudentChip({ student, logs, selected, onPress }) {
       {/* Avatar */}
       <View style={[styles.chipAvatar, selected && styles.chipAvatarSelected]}>
         <Text style={[styles.chipInitials, selected && styles.chipInitialsSelected]}>
-          {student.initials}
+          {student.first_name.charAt(0)}{student.last_name.charAt(0)}
         </Text>
       </View>
 
@@ -125,7 +130,7 @@ function StudentChip({ student, logs, selected, onPress }) {
         style={[styles.chipName, selected && styles.chipNameSelected]}
         numberOfLines={1}
       >
-        {student.name}
+        {student.first_name + " " + student.last_name}
       </Text>
 
       {/* Status dot — amber = needs log, green = logged */}
@@ -241,6 +246,33 @@ export default function AddLogScreen({ navigation, route }) {
   // Show the form when: no log today, OR teacher clicked Edit.
   const showForm = !todayLog || isEditing;
 
+  //Load Students
+  const [students, setStudents] = useState([]);
+
+  useEffect(() => {
+    async function loadStudents() {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+
+        const response = await axios.get(
+          `http://127.0.0.1:8000/api/select_students/${course.id}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+
+        setStudents(response.data);
+        alert("THis: "+JSON.stringify(response.data));
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadStudents();
+  }, []);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleSelectStudent(id) {
     setSelectedId(id);
@@ -317,7 +349,7 @@ export default function AddLogScreen({ navigation, route }) {
         </View>
 
         <View style={styles.rosterCard}>
-          {MOCK_STUDENTS.map(student => (
+          {students.map(student => (
             <StudentChip
               key={student.id}
               student={student}

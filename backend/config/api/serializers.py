@@ -26,6 +26,9 @@ class RegisterSerializer(serializers.Serializer):
                             role = role_obj)
         if role_obj.role_name == "Teacher":
             Teacher.objects.create(corresponding_user = user)
+        
+        if role_obj.role_name == "Student":
+            Student.objects.create(corresponding_user = user)
 
         if role_obj.role_name == "Parent":
             Parent.objects.create(corresponding_user = user)
@@ -180,3 +183,14 @@ class BehaviorLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = Behavior_Log
         fields = "__all__"
+
+# ── Student ──────────────────────────────────────────────────────────────────
+class StudentSerializer(serializers.ModelSerializer):
+    # Check work???????
+    id = serializers.IntegerField(source="student_id", read_only=True)
+    first_name = serializers.CharField(source="corresponding_user.first_name", read_only=True)
+    last_name = serializers.CharField(source="corresponding_user.last_name", read_only=True)
+
+    class Meta:
+        model = Student
+        fields = ["id", "first_name", "last_name"]
