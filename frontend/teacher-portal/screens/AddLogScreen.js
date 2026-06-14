@@ -9,7 +9,7 @@
 //      show it with an Edit button (opens AddLogForm inline).
 //      If no log yet, show the AddLogForm directly so the teacher can log now.
 //
-//   3. Report Generator — scoped to the selected student's full log history.
+//   3. Report Generator — Accessible via the "Report" button modal trigger.
 //
 // TODO (Django):
 //   - Replace MOCK_STUDENTS with GET /api/students/?classroom=<id>
@@ -51,9 +51,6 @@ const MOCK_STUDENTS = [
   { id: 5, name: 'Fatima Al-Zahra',   initials: 'FZ' },
 ];
 
-// Keyed by studentId → array of LogEntry.
-// Only student 1 and 3 have a log for today so the "needs log" dot is visible
-// on the others.
 const MOCK_LOGS = {
   1: [
     {
@@ -89,9 +86,6 @@ const MOCK_LOGS = {
   5: [],
 };
 
-
-
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -107,39 +101,6 @@ function getTodayLog(logs) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Single student pill in the roster */
-function StudentChip({ student, logs, selected, onPress }) {
-  const logged = hasLogToday(logs);
-  return (
-    <TouchableOpacity
-      style={[
-        styles.chip,
-        selected && styles.chipSelected,
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      {/* Avatar */}
-      <View style={[styles.chipAvatar, selected && styles.chipAvatarSelected]}>
-        <Text style={[styles.chipInitials, selected && styles.chipInitialsSelected]}>
-          {student.first_name.charAt(0)}{student.last_name.charAt(0)}
-        </Text>
-      </View>
-
-      <Text
-        style={[styles.chipName, selected && styles.chipNameSelected]}
-        numberOfLines={1}
-      >
-        {student.first_name + " " + student.last_name}
-      </Text>
-
-      {/* Status dot — amber = needs log, green = logged */}
-      <View style={[styles.statusDot, { backgroundColor: logged ? colors.success : colors.accent }]} />
-    </TouchableOpacity>
-  );
-}
-
-/** Compact read-only view of a log entry */
 function LogDetailView({ log, onEdit, viewHistory }) {
   const isAbsent = log.attendance === 'Absent' || log.attendance === 'Excused Absence';
   return (
@@ -209,14 +170,11 @@ function DetailRow({ label, value, bold = false, valueColor }) {
   );
 }
 
-/** Dot legend at top of roster */
 function DotLegend() {
   return (
     <View style={styles.legend}>
-      <View style={styles.legendItem}>
-        <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+      <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
         <Text style={styles.legendText}>Logged today</Text>
-      </View>
       <View style={styles.legendItem}>
         <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
         <Text style={styles.legendText}>Needs log</Text>
@@ -229,60 +187,50 @@ function DotLegend() {
 // Main screen
 // ---------------------------------------------------------------------------
 export default function AddLogScreen({ navigation, route }) {
-  const { className = 'Quran Class A' } = route.params ?? {};
+  const { course, student, className = 'Quran Class A' } = route.params ?? {};
 
-  // All logs keyed by studentId — in real app, fetched per student on select.
   const [allLogs, setAllLogs] = useState(MOCK_LOGS);
-
   const [selectedId,   setSelectedId]   = useState(MOCK_STUDENTS[0].id);
   const [isEditing,    setIsEditing]     = useState(false);
   const [viewingHistory, setViewingHistory] = useState(false);
-  const [reportExpanded, setReportExpanded] = useState(false);
+  const [viewingReport, setViewingReport]   = useState(false);
 
-  const selectedStudent = MOCK_STUDENTS.find(s => s.id === selectedId);
+  const selectedStudent = student ?? MOCK_STUDENTS.find(s => s.id === selectedId);
   const studentLogs     = allLogs[selectedId] ?? [];
   const todayLog        = getTodayLog(studentLogs);
 
-  // Show the form when: no log today, OR teacher clicked Edit.
   const showForm = !todayLog || isEditing;
 
-  //Load Students
   const [students, setStudents] = useState([]);
 
   useEffect(() => {
+    if(student) {
+      setStudents([student]);
+      return;
+    }
     async function loadStudents() {
       try {
         const token = await AsyncStorage.getItem('authToken');
-
         const response = await axios.get(
           `http://127.0.0.1:8000/api/select_students/${course.id}/`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        )
-
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         setStudents(response.data);
-        alert("THis: "+JSON.stringify(response.data));
       } catch (error) {
         console.error(error);
       }
     }
-
     loadStudents();
-  }, []);
+  }, [student, course?.id]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   function handleSelectStudent(id) {
     setSelectedId(id);
-    setIsEditing(false);   // reset edit state when switching students
+    setIsEditing(false);
     setViewingHistory(false);
-    setReportExpanded(false);
+    setViewingReport(false);
   }
 
   function handleAddLog(newLog) {
-    // TODO (Django): POST /api/logs/ with { ...newLog, student: selectedId }
     const entry = { id: Date.now(), date: TODAY, ...newLog };
     setAllLogs(prev => ({
       ...prev,
@@ -293,7 +241,6 @@ export default function AddLogScreen({ navigation, route }) {
   }
 
   function handleUpdateLog(updatedFields) {
-    // TODO (Django): PATCH /api/logs/<todayLog.id>/
     setAllLogs(prev => ({
       ...prev,
       [selectedId]: (prev[selectedId] ?? []).map(l =>
@@ -303,14 +250,9 @@ export default function AddLogScreen({ navigation, route }) {
     setIsEditing(false);
     setViewingHistory(false);
   }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  const { course } = route.params;
-
-
+ 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
-
       {/* Top bar */}
       <View style={styles.topBar}>
         <Pressable
@@ -337,40 +279,53 @@ export default function AddLogScreen({ navigation, route }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-
-      <View>
-        <Text style={styles.h2}>{course.title}</Text>
-      </View>
-
-        {/* ── SECTION 1: Student roster ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.h2}>Students</Text>
-          <DotLegend />
-        </View>
-
-        <View style={styles.rosterCard}>
-          {students.map(student => (
-            <StudentChip
-              key={student.id}
-              student={student}
-              logs={allLogs[student.id] ?? []}
-              selected={student.id === selectedId}
-              onPress={() => handleSelectStudent(student.id)}
-            />
-          ))}
+        <View>
+          <Text style={styles.h2}>{course?.title}</Text>
         </View>
 
         {/* ── SECTION 2: Log panel ── */}
         <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.h2}>{selectedStudent?.name}</Text>
+          <View style={{ flex: 1, marginRight: spacing.sm }}>
+            <Text style={styles.h2}>
+              {selectedStudent?.first_name 
+                ? `${selectedStudent.first_name} ${selectedStudent.last_name}` 
+                : selectedStudent?.name}
+            </Text>
+
             <Text style={styles.subtext}>
               {showForm
-                ? isEditing ? 'Editing today\'s log' : 'No log yet — record now'
-                : 'Today\'s session'}
+                ? isEditing ? "Editing today's log" : 'No log yet — record now'
+                : "Today's session"}
             </Text>
+
+            {!showForm && (
+              <View style={styles.inlineButtonRow}>
+                {/* Add Log Button */}
+                <TouchableOpacity 
+                  style={styles.inlineRowBtn} 
+                  onPress={() => setIsEditing(true)}
+                >
+                  <Ionicons name="add-circle-outline" size={16} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
+                  <Text style={styles.inlineRowBtnText}>Add Log</Text>
+                </TouchableOpacity>
+
+                {/* Report Generator Button Trigger */}
+                <TouchableOpacity 
+                  style={styles.inlineRowBtn} 
+                  onPress={() => setViewingReport(true)}
+                >
+                  <MaterialCommunityIcons 
+                    name="chart-bar" 
+                    size={16} 
+                    color={colors.textOnPrimary} 
+                    style={{ marginRight: spacing.xs }}
+                  />
+                  <Text style={styles.inlineRowBtnText}>Report</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-          {/* If viewing a log, show the "Logged ✓" badge */}
+          
           {!showForm && (
             <View style={styles.loggedBadge}>
               <MaterialCommunityIcons name="check" size={12} color={colors.success} />
@@ -404,28 +359,6 @@ export default function AddLogScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* ── SECTION 3: Report Generator ── */}
-        <TouchableOpacity
-          style={styles.reportToggle}
-          onPress={() => setReportExpanded(v => !v)}
-        >
-          <MaterialCommunityIcons
-            name={reportExpanded ? 'chevron-down' : 'chevron-right'}
-            size={18}
-            color={colors.text}
-            style={{ marginRight: spacing.sm }}
-          />
-          <Text style={styles.reportToggleText}>
-            Generate Report — {selectedStudent?.name}
-          </Text>
-        </TouchableOpacity>
-
-        {reportExpanded && (
-          <View style={styles.reportBody}>
-            <ReportGenerator studentId={selectedId} logs={studentLogs} />
-          </View>
-        )}
-
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
       
@@ -438,7 +371,6 @@ export default function AddLogScreen({ navigation, route }) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Log History</Text>
@@ -452,7 +384,6 @@ export default function AddLogScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
 
-            {/* Modal Body (Scrollable History List) */}
             <ScrollView 
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.xl }}
@@ -499,6 +430,42 @@ export default function AddLogScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+
+      {/* Report Generator Modal Triggered from button header row */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={viewingReport}
+        onRequestClose={() => setViewingReport(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Performance Report</Text>
+                <Text style={styles.modalSub}>
+                  {selectedStudent?.first_name 
+                    ? `${selectedStudent.first_name} ${selectedStudent.last_name}` 
+                    : selectedStudent?.name}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setViewingReport(false)}
+                style={styles.closeModalBtn}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: spacing.xl }}
+            >
+              <ReportGenerator studentId={selectedId} logs={studentLogs} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -510,7 +477,6 @@ const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.xl, paddingBottom: 60 },
 
-  // Top bar
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -548,7 +514,6 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.caption,
   },
 
-  // Section headers
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -559,7 +524,6 @@ const styles = StyleSheet.create({
   h2:      { fontSize: fonts.sizes.title, fontWeight: '800', color: colors.text },
   subtext: { fontSize: fonts.sizes.body,  color: colors.textMuted, marginTop: spacing.xs },
 
-  // ── Roster ──
   rosterCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -615,13 +579,35 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
 
-  // Legend
   legend:     { flexDirection: 'row', gap: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   legendDot:  { width: 8, height: 8, borderRadius: radii.pill },
   legendText: { fontSize: fonts.sizes.caption, color: colors.textMuted },
 
-  // ── Log panel card ──
+  inlineButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  inlineRowBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.md,
+    ...shadow,
+  },
+  inlineRowBtnText: {
+    fontSize: fonts.sizes.caption,
+    fontWeight: '700',
+    color: colors.textOnPrimary,
+  },
+
   panelCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -631,7 +617,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
 
-  // "Logged" badge next to section header
   loggedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -647,7 +632,6 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
 
-  // ── Log detail view ──
   loggedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -726,37 +710,6 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.body,
     fontWeight: '700',
   },
-
-  // ── Report Generator ──
-  reportToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radii.lg,
-    marginTop: spacing.xl,
-    marginBottom: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow,
-  },
-  reportToggleText: {
-    fontSize: fonts.sizes.subtitle,
-    fontWeight: '700',
-    color: colors.text,
-    flex: 1,
-  },
-  reportBody: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderTopWidth: 0,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-  },
-  //history modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

@@ -33,8 +33,7 @@ const REMEMBERED_USERNAME_KEY = 'rememberedUsername';
 
 export default function LoginScreen({ navigation }) {
   const { setAuthenticated } = useAuth();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
@@ -51,8 +50,7 @@ useEffect(() => {
         const split = saved.split('_');
 
         if (split.length >= 2) {
-          setFirstName(split[0]);
-          setLastName(split.slice(1).join('_'));
+          setEmail(split[0]);
         }
 
         setRememberMe(true);
@@ -65,12 +63,8 @@ useEffect(() => {
 function validate() {
   const next = {};
 
-  if (!firstName.trim()) {
-    next.firstName = 'First name is required.';
-  }
-
-  if (!lastName.trim()) {
-    next.lastName = 'Last name is required.';
+  if (!email.trim()) {
+    next.email = 'Email is required.';
   }
 
   const pwError = validatePassword(password);
@@ -91,15 +85,13 @@ async function handleLogin() {
     return;
   }
 
-  const username =
-    `${firstName.trim()}${lastName.trim()}`
-      .replace(/\s+/g, '');
+  const username = email.trim();
 
   try {
     if (rememberMe) {
       await AsyncStorage.setItem(
         REMEMBERED_USERNAME_KEY,
-        `${firstName.trim()}_${lastName.trim()}`
+        email.trim()
       );
     } else {
       await AsyncStorage.removeItem(
@@ -145,24 +137,16 @@ async function handleLogin() {
       <Text style={styles.welcomeSub}>Sign in to manage your classes</Text>
 
       <TextField
-        label="First Name"
-        iconName="person-outline"
-        value={firstName}
-        onChangeText={setFirstName}
-        placeholder="First Name"
-        error={errors.firstName}
-        autoCapitalize="words"
+        label="Email"
+        iconName="mail-outline"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="Email"
+        error={errors.email}
+        autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
       />
-
-      <TextField
-        label="Last Name"
-        iconName="person-outline"
-        value={lastName}
-        onChangeText={setLastName}
-        placeholder="Last Name"
-        error={errors.lastName}
-        autoCapitalize="words"
-/>
 
       <TextField
         label="Password"
@@ -176,7 +160,8 @@ async function handleLogin() {
         autoComplete="password"
         returnKeyType="done"
         onSubmitEditing={handleLogin}
-      />
+/>
+
 
       {/* Remember me  +  Forgot password */}
       <View style={styles.row}>

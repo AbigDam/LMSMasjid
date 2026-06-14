@@ -188,7 +188,7 @@ useEffect(() => {
   }
 
   function handleNavigateClass(course) {
-    navigation.navigate('AddLog', { course });
+    navigation.navigate('StudentRoster', { course });
     setMenuOpen(false);
   }
 
@@ -204,17 +204,17 @@ useEffect(() => {
               style={styles.menuIconButton} 
               hitSlop={12}
             >
-              <Ionicons name={sidebarVisible ? "menu-fold" : "menu"} size={28} color="#9A6A3C" />
+              <Ionicons name={sidebarVisible ? "close" : "menu"} size={28} color="#9A6A3C" />
             </Pressable>
             
           ) : (
             // Mobile Hamburger Drawer button
             <Pressable 
-              onPress={() => setMenuOpen(true)} 
+              onPress={() => setMenuOpen(!menuOpen)} 
               style={styles.menuIconButton} 
               hitSlop={12}
             >
-              <Ionicons name="menu" size={32} color="#9A6A3C" />
+              <Ionicons name={menuOpen ? "close" : "menu"} size={32} color="#9A6A3C" />
             </Pressable>
           )}
           {isWide ? (
@@ -283,7 +283,7 @@ useEffect(() => {
                   <View key={course.id} style={styles.courseCardContainerOverride}>
                     <CourseCard
                       course={course}
-                      onViewDetails={() => navigation.navigate('AddLog', { course })}
+                      onViewDetails={() => navigation.navigate('StudentRoster', { course })}
                     />
                   </View>
                 ))}

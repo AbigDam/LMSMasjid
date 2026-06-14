@@ -1,10 +1,10 @@
-export type Surah = {
-  number: number;
-  name: string;
-  ayahs: number;
+export const Surah = {
+  number: 0,
+  name: '',
+  ayahs: 0,
 };
 
-export const quranSurahs: Surah[] = [
+export const quranSurahs = [
   { number: 1, name: 'Al-Fatihah', ayahs: 7 },
   { number: 2, name: 'Al-Baqarah', ayahs: 286 },
   { number: 3, name: "Ali 'Imran", ayahs: 200 },

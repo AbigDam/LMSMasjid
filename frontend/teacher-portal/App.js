@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import LoginScreen from './screens/LoginScreen';
 import SignupScreen from './screens/SignupScreen';
 import DashboardScreen from './screens/DashboardScreen';
+import StudentView     from './screens/StudentView';
 import TestBackend from './screens/TestBackend';
 import AddLogScreen from './screens/AddLogScreen';
 import { AuthContext } from './context/AuthContext';
@@ -32,6 +33,7 @@ function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="StudentRoster" component={StudentView} options={{ title: 'Class Roster' }} />
       <Stack.Screen name="AddLog" component={AddLogScreen} />
     </Stack.Navigator>
   );
