@@ -43,21 +43,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ---------------------------------------------------------------------------
 const TODAY = new Date().toISOString().split('T')[0];
 
-const MOCK_STUDENTS = [
-  { id: 1, name: 'Ahmad Al-Farsi',    initials: 'AF' },
-  { id: 2, name: 'Yusuf Khalid',      initials: 'YK' },
-  { id: 3, name: 'Mariam Hassan',     initials: 'MH' },
-  { id: 4, name: 'Bilal Osman',       initials: 'BO' },
-  { id: 5, name: 'Fatima Al-Zahra',   initials: 'FZ' },
-];
-
 // Keyed by studentId → array of LogEntry.
 // Only student 1 and 3 have a log for today so the "needs log" dot is visible
 // on the others.
 const MOCK_LOGS = {
   1: [
     {
-      id: 101, date: TODAY,
+      student_id: 101, date: TODAY,
       surah: 2, surahName: 'Al-Baqarah', ayahStart: 11, ayahEnd: 20,
       type: 'memorization', behavior: 5, grade: 'pass',
       assignments: 'Memorize ayahs 21-25. Focus on tajweed.',
@@ -232,14 +224,13 @@ export default function AddLogScreen({ navigation, route }) {
   const { className = 'Quran Class A' } = route.params ?? {};
 
   // All logs keyed by studentId — in real app, fetched per student on select.
-  const [allLogs, setAllLogs] = useState(MOCK_LOGS);
-
-  const [selectedId,   setSelectedId]   = useState(MOCK_STUDENTS[0].id);
+  const [allLogs, setAllLogs] = useState({});
+  //const [selectedId,   setSelectedId]   = useState(MOCK_STUDENTS[0].id);
+  const [selectedId, setSelectedId] = useState(null);
   const [isEditing,    setIsEditing]     = useState(false);
   const [viewingHistory, setViewingHistory] = useState(false);
   const [reportExpanded, setReportExpanded] = useState(false);
-
-  const selectedStudent = MOCK_STUDENTS.find(s => s.id === selectedId);
+  //const selectedStudent = MOCK_STUDENTS.find(s => s.id === selectedId);
   const studentLogs     = allLogs[selectedId] ?? [];
   const todayLog        = getTodayLog(studentLogs);
 
@@ -248,6 +239,7 @@ export default function AddLogScreen({ navigation, route }) {
 
   //Load Students
   const [students, setStudents] = useState([]);
+
 
   useEffect(() => {
     async function loadStudents() {
@@ -264,13 +256,36 @@ export default function AddLogScreen({ navigation, route }) {
         )
 
         setStudents(response.data);
-        alert("THis: "+JSON.stringify(response.data));
+        setSelectedId(response.data[0]?.id ?? null);  
+        //alert("This: "+JSON.stringify(response.data));
       } catch (error) {
         console.error(error);
       }
     }
 
     loadStudents();
+  }, []);
+
+  const selectedStudent = students.find(s => s.id === selectedId) ?? { name: "Loading", id: null };  
+
+  useEffect(() => {
+      async function loadLogs() {
+          try {
+              const token = await AsyncStorage.getItem('authToken');
+              const response = await axios.get(
+                  `http://127.0.0.1:8000/api/get_logs/?class_id=${course.id}`,
+                  {
+                      headers: {
+                          Authorization: `Bearer ${token}`,
+                      },
+                  }
+              );
+              setAllLogs(response.data);
+          } catch (error) {
+              console.error(error);
+          }
+      }
+      loadLogs();
   }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -281,24 +296,78 @@ export default function AddLogScreen({ navigation, route }) {
     setReportExpanded(false);
   }
 
-  function handleAddLog(newLog) {
-    // TODO (Django): POST /api/logs/ with { ...newLog, student: selectedId }
-    const entry = { id: Date.now(), date: TODAY, ...newLog };
+async function handleAddLog(newLog) {
+  const logTypeMap = {
+    'memorization': 1,
+    'review': 2,
+    'reading': 0,
+  };
+  const payload = {
+    student_id: selectedId,
+    class_id: course.id,
+    surah: newLog.surah,
+    starting_ayah: newLog.ayahStart,
+    ending_ayah: newLog.ayahEnd,
+    passed: newLog.grade === 'pass',
+    comments: newLog.behavior ?? '',
+    date: TODAY,
+    log_type: logTypeMap[newLog.type],
+  };
+
+  const response = await fetch(`http://127.0.0.1:8000/api/create_log/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    console.error('Failed to create log', await response.text());
+    return;
+  }
+  const { id } = await response.json();
+  const entry = { id, date: TODAY, ...newLog };
+  setAllLogs(prev => ({
+    ...prev,
+    [selectedId]: [entry, ...(prev[selectedId] ?? [])],
+  }));
+  setIsEditing(false);
+  setViewingHistory(false);
+}
+
+  async function handleUpdateLog(updatedFields) {
+    const logTypeMap = {
+      'memorization': 1,
+      'review': 2,
+      'reading': 0,
+    };
+    alert("Updating log: " + JSON.stringify(updatedFields));
+    const payload = {
+      student_id: selectedId,
+      class_id: course.id,
+      surah: updatedFields.surah,
+      starting_ayah: updatedFields.ayahStart,
+      ending_ayah: updatedFields.ayahEnd,
+      passed: updatedFields.grade === 'pass',
+      comments: updatedFields.behavior ?? '',
+      date: TODAY,
+      log_type: logTypeMap[updatedFields.type],
+    };
+
+    const response = await fetch(`http://127.0.0.1:8000/api/update_log/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to create log', await response.text());
+      return;
+    }
+    const { id } = await response.json();
+    const entry = { id, date: TODAY, ...updatedFields };
     setAllLogs(prev => ({
       ...prev,
       [selectedId]: [entry, ...(prev[selectedId] ?? [])],
-    }));
-    setIsEditing(false);
-    setViewingHistory(false);
-  }
-
-  function handleUpdateLog(updatedFields) {
-    // TODO (Django): PATCH /api/logs/<todayLog.id>/
-    setAllLogs(prev => ({
-      ...prev,
-      [selectedId]: (prev[selectedId] ?? []).map(l =>
-        l.id === todayLog.id ? { ...l, ...updatedFields } : l
-      ),
     }));
     setIsEditing(false);
     setViewingHistory(false);
@@ -363,7 +432,7 @@ export default function AddLogScreen({ navigation, route }) {
         {/* ── SECTION 2: Log panel ── */}
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.h2}>{selectedStudent?.name}</Text>
+            <Text style={styles.h2}>{selectedStudent?.first_name} {selectedStudent?.last_name}</Text>
             <Text style={styles.subtext}>
               {showForm
                 ? isEditing ? 'Editing today\'s log' : 'No log yet — record now'
@@ -382,7 +451,7 @@ export default function AddLogScreen({ navigation, route }) {
         <View style={styles.panelCard}>
           {showForm ? (
             <AddLogForm
-              onSubmit={isEditing ? handleUpdateLog : handleAddLog}
+              onSubmit={isEditing ? handleUpdateLog : handleAddLog}   //Removed editing line since we are not allowing editing for now
               initialData={isEditing && todayLog ? {
                 attendance:  todayLog.attendance || 'Present',
                 surah:       todayLog.surah,
@@ -416,7 +485,7 @@ export default function AddLogScreen({ navigation, route }) {
             style={{ marginRight: spacing.sm }}
           />
           <Text style={styles.reportToggleText}>
-            Generate Report — {selectedStudent?.name}
+            Generate Report — {selectedStudent?.first_name} {selectedStudent?.last_name}
           </Text>
         </TouchableOpacity>
 
@@ -442,7 +511,7 @@ export default function AddLogScreen({ navigation, route }) {
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Log History</Text>
-                <Text style={styles.modalSub}>{selectedStudent?.name}</Text>
+                <Text style={styles.modalSub}>{selectedStudent?.first_name} {selectedStudent?.last_name}</Text>
               </View>
               <TouchableOpacity 
                 onPress={() => setViewingHistory(false)}

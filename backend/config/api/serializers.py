@@ -184,6 +184,33 @@ class BehaviorLogSerializer(serializers.ModelSerializer):
         model = Behavior_Log
         fields = "__all__"
 
+class CreateLogSerializer(serializers.Serializer):
+    student_id = serializers.IntegerField()
+    class_id = serializers.IntegerField()
+    surah = serializers.IntegerField()
+    starting_ayah = serializers.IntegerField()
+    ending_ayah = serializers.IntegerField()
+    passed = serializers.BooleanField()
+    comments = serializers.CharField(required=False, allow_blank=True, default="")
+    date = serializers.DateField(default=datetime.date.today)
+    log_type = serializers.IntegerField() # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+
+    def create(self, validated_data):
+        student = Student.objects.get(student_id=validated_data["student_id"])
+        classroom = Class.objects.get(class_id=validated_data["class_id"])
+
+        log = Log.objects.create(
+            student=student,
+            logged_by=classroom,
+            surah=validated_data["surah"],
+            ayah_init=validated_data["starting_ayah"],
+            ayah_final=validated_data["ending_ayah"],
+            passed=validated_data["passed"],
+            comments=validated_data.get("comments", ""),
+            date=validated_data["date"],
+            log_type=validated_data["log_type"],
+        )
+        return log
 # ── Student ──────────────────────────────────────────────────────────────────
 class StudentSerializer(serializers.ModelSerializer):
     # Check work???????

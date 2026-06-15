@@ -69,7 +69,7 @@ class Attendance_Log(models.Model):
 class Log(models.Model):
     log_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="reading_log")
-    logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_reading_log")
+    logged_by = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="student_reading_log")
     surah = models.IntegerField()
     ayah_init = models.IntegerField()
     ayah_final = models.IntegerField()
