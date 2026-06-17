@@ -142,7 +142,6 @@ class GetLogsView(generics.GenericAPIView):
         return Response(result, status=status.HTTP_200_OK)
 
 ###  Muwahid Starts here ###
-
 class LogAttendanceView(generics.CreateAPIView):
     serializer_class = LogAttendanceSerializer
     permission_classes = [IsAuthenticated]

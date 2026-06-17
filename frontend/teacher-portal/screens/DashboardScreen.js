@@ -188,7 +188,7 @@ useEffect(() => {
   }
 
   function handleNavigateClass(course) {
-    navigation.navigate('AddLog', { course });
+    navigation.navigate('StudentRoster', { course });
     setMenuOpen(false);
   }
 
@@ -283,7 +283,8 @@ useEffect(() => {
                   <View key={course.id} style={styles.courseCardContainerOverride}>
                     <CourseCard
                       course={course}
-                      onViewDetails={() => navigation.navigate('AddLog', { course })}
+                      onViewDetails={() => navigation.navigate('StudentRoster', { course })}
+                      
                     />
                   </View>
                 ))}

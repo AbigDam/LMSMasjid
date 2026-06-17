@@ -12,6 +12,7 @@ import SignupScreen from './screens/SignupScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import TestBackend from './screens/TestBackend';
 import AddLogScreen from './screens/AddLogScreen';
+import StudentViewScreen from './screens/StudentViewScreen';
 import { AuthContext } from './context/AuthContext';
 
 const Stack = createNativeStackNavigator();
@@ -33,6 +34,7 @@ function AppStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Dashboard" component={DashboardScreen} />
       <Stack.Screen name="AddLog" component={AddLogScreen} />
+      <Stack.Screen name="StudentRoster" component={StudentViewScreen} />
     </Stack.Navigator>
   );
 }
