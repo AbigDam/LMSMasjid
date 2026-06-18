@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 from .views import *
+from . import adminViews
+from .adminViews import *
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
@@ -23,4 +25,7 @@ urlpatterns = [
     path("log_behavior/", LogBehaviorView.as_view(), name="log_behavior"),
     path("get_behavior_log/", GetBehaviorLogView.as_view(), name="get_behavior_log"),
     path("get_behavior_issues/", GetBehaviorIssuesView.as_view(), name="get_behavior_issues"),
+
+    # Admin Views
+    path("admin/classes/", ClassesList.as_view(), name="admin_classes"),
 ]

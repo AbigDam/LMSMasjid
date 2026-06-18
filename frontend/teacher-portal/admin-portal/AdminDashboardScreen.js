@@ -1,10 +1,10 @@
 // screens/DashboardScreen.js
 // -----------------------------------------------------------------------------
-// Al-Hidaya Teacher Dashboard (Phase II - Backend Data).
+// Al-Hidaya Admin Dashboard (Phase II - Backend Data).
 //
 // RESPONSIVE LAYOUT (driven by screen width, breakpoint = 900px):
-//   - Desktop / tablet (>= 900px): the Sidebar is PERSISTENT on the left.
-//   - Mobile (< 900px): the Sidebar is HIDDEN. A hamburger button in the top
+//   - Desktop / tablet (>= 900px): the AdminSidebar is PERSISTENT on the left.
+//   - Mobile (< 900px): the AdminSidebar is HIDDEN. A hamburger button in the top
 //     bar opens it as a slide-out drawer (with a dim backdrop). Tapping a class,
 //     the ✕, or outside the drawer closes it. The main content (greeting, stats,
 //     prayer times, course cards, announcements) is fully visible either way.
@@ -15,8 +15,8 @@
 // Works on iOS, Android, and Web.
 // screens/DashboardScreen.js
 // -----------------------------------------------------------------------------
-// Al-Hidaya Teacher Dashboard — Bronze & White Style 
-// (Expanded Toggleable Sidebar, Wide Cards & Large Typography)
+// Al-Hidaya Admin Dashboard — Bronze & White Style 
+// (Expanded Toggleable AdminSidebar, Wide Cards & Large Typography)
 // -----------------------------------------------------------------------------
 
 import { useEffect, useRef, useState} from 'react';
@@ -35,7 +35,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import Sidebar from '../components/Sidebar';
+import AdminSidebar from '../components/AdminSidebar';
 import CourseCard from '../components/CourseCard';
 import { brand, brandImages } from '../constants/brand';
 import axios from 'axios';
@@ -43,7 +43,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 
 const WIDE_BREAKPOINT = 900;
-// Increased sidebar width to accommodate slightly bigger layout and larger font sizes
+// Increased AdminSidebar width to accommodate slightly bigger layout and larger font sizes
 const DRAWER_WIDTH = 290; 
 
 const BRONZE_COLORS = {
@@ -77,15 +77,15 @@ export default function DashboardScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const isWide = width >= WIDE_BREAKPOINT;
 
-  // New toggle state for controlling desktop sidebar presentation 
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  // New toggle state for controlling desktop AdminSidebar presentation 
+  const [AdminSidebarVisible, setAdminSidebarVisible] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0)).current;
 
-  const [teacher, setTeacher] = useState(null);
+  const [admin, setAdmin] = useState(null);
   const [courses, setCourses] = useState([]);
   const [announcements, setAnnouncements] = useState([]); 
   const { setAuthenticated } = useAuth();
@@ -96,7 +96,7 @@ export default function DashboardScreen({ navigation }) {
         const token = await AsyncStorage.getItem('authToken');
 
         const response = await axios.get(
-          'http://127.0.0.1:8000/api/select_classes/',
+          'http://127.0.0.1:8000/api/admin/classes/',
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -128,7 +128,7 @@ useEffect(() => {
         }
       )
 
-      setTeacher(response.data);
+      setAdmin(response.data);
     } catch (error) {
       console.error(error);
     }
@@ -188,7 +188,7 @@ useEffect(() => {
   }
 
   function handleNavigateClass(course) {
-    navigation.navigate('StudentRoster', { course });
+    navigation.navigate('AddLog', { course });
     setMenuOpen(false);
   }
 
@@ -198,13 +198,13 @@ useEffect(() => {
       <View style={styles.hubHeader}>
         <View style={styles.headerLeft}>
           {isWide ? (
-            // Desktop Sidebar Toggle button
+            // Desktop AdminSidebar Toggle button
             <Pressable 
-              onPress={() => setSidebarVisible(!sidebarVisible)} 
+              onPress={() => setAdminSidebarVisible(!AdminSidebarVisible)} 
               style={styles.menuIconButton} 
               hitSlop={12}
             >
-              <Ionicons name={sidebarVisible ? "close" : "menu"} size={28} color="#9A6A3C" />
+              <Ionicons name={AdminSidebarVisible ? "close" : "menu"} size={28} color="#9A6A3C" />
             </Pressable>
             
           ) : (
@@ -228,9 +228,9 @@ useEffect(() => {
         </View>
 
         <View style={styles.headerRight}>
-          <View style={styles.teacherBadgeContainer}>
+          <View style={styles.adminBadgeContainer}>
             <View style={styles.onlineDot} />
-            <Text style={styles.teacherBadgeText}>{teacher?.first_name} {teacher?.last_name}</Text>
+            <Text style={styles.adminBadgeText}>{admin?.first_name} {admin?.last_name}</Text>
           </View>
           <Pressable onPress={handleSignOut} style={styles.logoutButton}>
             <Ionicons name="log-out-outline" size={26} color="#FFFFFF" />
@@ -239,15 +239,15 @@ useEffect(() => {
       </View>
 
       <View style={styles.mainLayout}>
-        {/* Desktop Sidebar (Render conditionally based on state logic) */}
-        {isWide && sidebarVisible && (
+        {/* Desktop AdminSidebar (Render conditionally based on state logic) */}
+        {isWide && AdminSidebarVisible && (
           <View style={styles.desktopNavWrapper}>
-            <Sidebar
+            <AdminSidebar
               courses={courses}
               activeId={courses[0]?.id}
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
-              onClose={() => setSidebarVisible(false)}
+              onClose={() => setAdminSidebarVisible(false)}
             />
           </View>
         )}
@@ -257,8 +257,8 @@ useEffect(() => {
           
           {/* Welcome Banner Box */}
           <View style={styles.hubWelcomeBanner}>
-            <Text style={styles.hubGreeting}>Teacher {teacher?.first_name}</Text>
-            <Text style={styles.hubSubGreeting}>Al-Hidaya Teacher Portal Dashboard — Manage your active classes and student logs.</Text>
+            <Text style={styles.hubGreeting}>Admin {admin?.first_name}</Text>
+            <Text style={styles.hubSubGreeting}>Al-Hidaya Admin Portal Dashboard — Manage users, classes and students.</Text>
           </View>
 
           {/* Large High-Visibility Metrics */}
@@ -283,19 +283,15 @@ useEffect(() => {
                   <View key={course.id} style={styles.courseCardContainerOverride}>
                     <CourseCard
                       course={course}
-                      onViewDetails={() => navigation.navigate('StudentRoster', { course })}
-                      
+                      onViewDetails={() => navigation.navigate('AddLog', { course })}
                     />
                   </View>
                 ))}
               </View>
             </View>
 
-            {/* Utility Sidebar Column */}
+            {/* Utility AdminSidebar Column */}
             <View style={styles.utilitiesSideSection}>
-
-              
-
 
               {/* Administrative Notice Board Box */}
               <View style={styles.hubUtilityWidget}>
@@ -330,7 +326,7 @@ useEffect(() => {
           </Animated.View>
 
           <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
-            <Sidebar
+            <AdminSidebar
               courses={courses}
               activeId={courses[0]?.id}
               onNavigate={handleNavigateClass}
@@ -365,9 +361,9 @@ const styles = StyleSheet.create({
   hubTitle: { fontSize: 24, fontWeight: '700', color: BRONZE_COLORS.textDark, letterSpacing: 0.3 },
   
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  teacherBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(243, 133, 6, 0.18)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, gap: 10 },
+  adminBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(243, 133, 6, 0.18)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, gap: 10 },
   onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#01885b' },
-  teacherBadgeText: { color: '#0f0f0f', fontSize: 16, fontWeight: '600' },
+  adminBadgeText: { color: '#0f0f0f', fontSize: 16, fontWeight: '600' },
   logoutButton: { padding: 8, backgroundColor: 'rgb(221, 5, 5)', borderRadius: 8 },
 
   scrollCanvas: { padding: 32, maxWidth: 1600, width: '100%', alignSelf: 'center' },
