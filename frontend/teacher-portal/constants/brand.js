@@ -11,7 +11,7 @@ export const brand = {
   name: 'Al-Hidaya Center',
   shortName: 'Al-Hidaya',
   tagline: 'Islamic Community',
-  portal: 'Teacher Portal',
+  portal: 'School Portal',
 
   // Contact
   address: '322 Troy Schenectady Rd, Latham, NY 12110',

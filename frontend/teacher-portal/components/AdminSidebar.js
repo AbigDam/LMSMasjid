@@ -9,7 +9,7 @@
 //   - red "Sign Out" pinned at the bottom
 //
 // Props:
-//   courses      array of { id, title }  — the teacher's classes
+//   courses      array of { id, title }  — classes
 //   activeId     id of the currently highlighted class
 //   onNavigate   (course) => void        — Phase I: placeholder / console.log
 //   onSignOut    () => void              — returns to Login
@@ -17,13 +17,17 @@
 
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { brand, brandImages } from '../constants/brand';
 import { colors, spacing, radii, fonts } from '../constants/theme';
 
 const SIDEBAR_WIDTH = 290;
 
+
 export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut, onClose }) {
+  const navigation = useNavigation();
+
   return (
     <View style={styles.sidebar}>
       {/* Brand */}
@@ -35,11 +39,65 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
           <Text style={styles.brandName} numberOfLines={1}>{brand.shortName}</Text>
           <Text style={styles.brandSub} numberOfLines={1}>{brand.portal}</Text>
         </View>
+        {/* Close (✕) — only rendered in the mobile drawer (onClose provided) */}
+        {onClose ? (
+          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close menu">
+            <Ionicons name="arrow-back-outline" size={22} color={colors.sidebarText} />
+          </Pressable>
+        ) : null}
       </View>
 
-      <Text style={styles.sectionLabel}>Classes</Text>
+      <Text style={styles.sectionLabel}>General</Text>
 
       {/* Class rows: icon + name */}
+      {/* Dashboard button */}
+      <View style={styles.list}>
+        <Pressable
+          onPress={() => navigation.navigate('AdminDashboardScreen')}
+          style={[styles.item, !activeId && styles.itemActive]}
+          accessibilityRole="button"
+          accessibilityLabel="Main Dashboard"
+        >
+          <View style={[styles.iconChip, !activeId && styles.iconChipActive]}>
+            <MaterialCommunityIcons
+              name="view-dashboard"
+              size={20}
+              color={!activeId ? colors.textOnPrimary : colors.sidebarText}
+            />
+          </View>
+          <Text
+            style={[styles.itemLabel, !activeId && styles.itemLabelActive]}
+            numberOfLines={2}
+          >
+            Dashboard
+          </Text>
+        </Pressable>
+        </View>
+
+      {/* Class button */}
+      <View style={styles.list}>
+        <Pressable
+          onPress={() => navigation.navigate('ManageCourses')}
+          style={[styles.item, !activeId && styles.itemActive]}
+          accessibilityRole="button"
+          accessibilityLabel="Manage Courses"
+        >
+          <View style={[styles.iconChip, !activeId && styles.iconChipActive]}>
+            <MaterialCommunityIcons
+              name="book-open-variant"
+              size={20}
+              color={!activeId ? colors.textOnPrimary : colors.sidebarText}
+            />
+          </View>
+          <Text
+            style={[styles.itemLabel, !activeId && styles.itemLabelActive]}
+            numberOfLines={2}
+          >
+            Manage Courses
+          </Text>
+        </Pressable>
+        </View>
+
       <View style={styles.list}>
         {courses.map((course) => {
           const active = course.id === activeId;
@@ -53,7 +111,7 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
             >
               <View style={[styles.iconChip, active && styles.iconChipActive]}>
                 <MaterialCommunityIcons
-                  name="book-education-outline"
+                  name="book-open-variant"
                   size={20}
                   color={active ? colors.textOnPrimary : colors.sidebarText}
                 />

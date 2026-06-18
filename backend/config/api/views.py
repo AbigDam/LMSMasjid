@@ -50,6 +50,7 @@ class CurrentUser(APIView):
             "last_name": request.user.last_name,
             "email": request.user.email,
             "username": request.user.username,
+            "role_id": request.user.role_id,
         })
 
 class AnnouncementListView(ListAPIView):
