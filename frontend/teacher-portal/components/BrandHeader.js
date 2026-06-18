@@ -16,7 +16,7 @@ export default function BrandHeader() {
       <Image source={brandImages.logo} style={styles.logo} resizeMode="contain" />
       <Text style={styles.name}>{brand.name}</Text>
       <View style={styles.pill}>
-        <Text style={styles.pillText}>{brand.portal}</Text>
+        <Text style={styles.pillText}>School Portal</Text>
       </View>
     </View>
   );

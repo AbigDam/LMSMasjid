@@ -1,6 +1,6 @@
 // screens/LoginScreen.js
 // -----------------------------------------------------------------------------
-// Al-Hidaya teacher login (Phase II - Backend Integration).
+// Al-Hidaya Admin login (Phase II - Backend Integration).
 //
 // Behaviour:
 //   - Email + password (password masked by default, with show/hide toggle)
@@ -114,13 +114,15 @@ async function handleLogin() {
         password,
       }
     );
-
+    
     const accessToken = response.data.access;
 
     await AsyncStorage.setItem('authToken', accessToken);
 
     // 🔥 THIS is the only navigation trigger you need
+    
     setAuthenticated(true);
+    
 
   } catch (error) {
     console.error(error);
@@ -142,7 +144,7 @@ async function handleLogin() {
   return (
     <AuthScene>
       <Text style={styles.welcome}>Welcome back</Text>
-      <Text style={styles.welcomeSub}>Sign in to manage your classes</Text>
+      {/* <Text style={styles.welcomeSub}>Sign in to manage your classes</Text> */}
 
       <TextField
         label="First Name"
@@ -206,16 +208,11 @@ async function handleLogin() {
       </Pressable>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>New teacher? </Text>
+        <Text style={styles.footerText}>New User? </Text>
         <Pressable onPress={() => navigation.navigate('Signup')} hitSlop={8}>
           <Text style={styles.link}>Create an account</Text>
         </Pressable>
       </View>
-
-
-      <Pressable onPress={() => navigation.navigate('TestBackend')}>
-      <Text style={{ color: 'red' }}>Backend Debug</Text>
-    </Pressable>
 
     </AuthScene>
     
