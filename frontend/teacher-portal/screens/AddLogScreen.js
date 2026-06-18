@@ -1,22 +1,3 @@
-// screens/AddLogScreen.js
-// -----------------------------------------------------------------------------
-// Teacher daily log screen. Three inline sections:
-//
-//   1. Student roster — all students in the class, coloured dot showing
-//      whether a log exists for today. Tap to select.
-//
-//   2. Log panel — if the selected student already has a log for today,
-//      show it with an Edit button (opens AddLogForm inline).
-//      If no log yet, show the AddLogForm directly so the teacher can log now.
-//
-//   3. Report Generator — Accessible via the "Report" button modal trigger.
-//
-// TODO (Django):
-//   - Replace MOCK_STUDENTS with GET /api/students/?classroom=<id>
-//   - Replace INITIAL_LOGS  with GET /api/logs/?student=<id>
-//   - handleAddLog    → POST  /api/logs/
-//   - handleUpdateLog → PATCH /api/logs/<id>/
-// -----------------------------------------------------------------------------
 
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -58,9 +39,13 @@ function getTodayLog(logs) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-
+const ATTENDANCE_LABELS = {
+  0: 'Present',
+  1: 'Absent',
+  2: 'Excused Absence',
+};
 function LogDetailView({ log, onEdit, viewHistory }) {
-  const isAbsent = log.attendance === 'Absent' || log.attendance === 'Excused Absence';
+  const isAbsent = log.attendance === 1 || log.attendance === 2;
   return (
     <View>
       <View style={styles.loggedBanner}>
@@ -69,11 +54,12 @@ function LogDetailView({ log, onEdit, viewHistory }) {
       </View>
 
       <View style={styles.detailCard}>
-        {isAbsent ? (
-          <DetailRow label="Attendance" value={log.attendance} bold />
-        ) : (
-          <>
-            <DetailRow label="Attendance" value={log.attendance || 'Present'} />
+        {isAbsent ?
+        (<DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] } bold />) 
+            : 
+          (
+            <>
+            <DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] } />
             <DetailRow
               label="Surah & Ayahs"
               value={`${log.surahName} · Ayahs ${log.ayahStart}–${log.ayahEnd}`}
@@ -205,8 +191,10 @@ async function handleAddLog(newLog) {
     starting_ayah: newLog.ayahStart,
     ending_ayah: newLog.ayahEnd,
     passed: newLog.grade === 'pass',
-    comments: newLog.behavior ?? '',
+    comments: newLog.comments ?? '',
+    behavior: newLog.behavior,
     date: TODAY,
+    attendance: newLog.attendance === 'Absent' ? 1 : (newLog.attendance === 'Excused Absence' ? 2 : 0),
     log_type: logTypeMap[newLog.type],
   };
 
@@ -236,6 +224,7 @@ async function handleAddLog(newLog) {
       'review': 2,
       'reading': 0,
     };
+
     const payload = {
       student_id: selectedId,
       class_id: course.id,
@@ -243,11 +232,12 @@ async function handleAddLog(newLog) {
       starting_ayah: updatedFields.ayahStart,
       ending_ayah: updatedFields.ayahEnd,
       passed: updatedFields.grade === 'pass',
-      comments: updatedFields.behavior ?? '',
+      comments: updatedFields.comments ?? '',
+      behavior: updatedFields.behavior,
       date: TODAY,
       log_type: logTypeMap[updatedFields.type],
+      attendance: updatedFields.attendance === 'Absent' ? 1 : (updatedFields.attendance === 'Excused Absence' ? 2 : 0),
     };
-
     const response = await fetch(`http://127.0.0.1:8000/api/update_log/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -319,14 +309,6 @@ async function handleAddLog(newLog) {
 
             {!showForm && (
               <View style={styles.inlineButtonRow}>
-                {/* Add Log Button */}
-                <TouchableOpacity 
-                  style={styles.inlineRowBtn} 
-                  onPress={() => setIsEditing(true)}
-                >
-                  <Ionicons name="add-circle-outline" size={16} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
-                  <Text style={styles.inlineRowBtnText}>Add Log</Text>
-                </TouchableOpacity>
 
                 {/* Report Generator Button Trigger */}
                 <TouchableOpacity 
@@ -427,7 +409,7 @@ async function handleAddLog(newLog) {
                       </View>
                     </View>
 
-                    {log.attendance !== 'Absent' && (
+                    {log.attendance == 0 && (
                       <View style={styles.historyCardBody}>
                         <Text style={styles.historyMainText}>
                           {log.surahName} · Ayahs {log.ayahStart}–{log.ayahEnd}
@@ -480,7 +462,7 @@ async function handleAddLog(newLog) {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.xl }}
             >
-              <ReportGenerator studentId={selectedId} logs={studentLogs} />
+              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id}/>
             </ScrollView>
           </View>
         </View>

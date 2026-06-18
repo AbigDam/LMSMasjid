@@ -36,11 +36,7 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
           <Text style={styles.brandSub} numberOfLines={1}>{brand.portal}</Text>
         </View>
         {/* Close (✕) — only rendered in the mobile drawer (onClose provided) */}
-        {onClose ? (
-          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close menu">
-            <Ionicons name="close" size={22} color={colors.sidebarText} />
-          </Pressable>
-        ) : null}
+
       </View>
 
       <Text style={styles.sectionLabel}>My Classes</Text>

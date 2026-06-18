@@ -96,21 +96,55 @@ class UpdateLogView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        instance.surah = request.data.get('surah')
-        instance.ayah_init = request.data.get('starting_ayah')
-        instance.ayah_final = request.data.get('ending_ayah')
-        instance.passed = request.data.get('passed')
-        instance.comments = request.data.get('comments')
-        instance.save()
+        if request.data.get('attendance') == 0:
+            instance.surah = request.data.get('surah')
+            instance.ayah_init = request.data.get('starting_ayah')
+            instance.ayah_final = request.data.get('ending_ayah')
+            instance.passed = request.data.get('passed')
+            instance.comments = request.data.get('comments')
+            instance.behavior = request.data.get('behavior')
+            instance.attendance = request.data.get('attendance')
+            instance.save()
+        else:
+            instance.surah = None
+            instance.ayah_init =  None
+            instance.ayah_final =  None
+            instance.passed = None
+            instance.comments = ""
+            instance.behavior = None
+            instance.attendance = request.data.get('attendance')
+            instance.save()
         
         return Response({"id": instance.log_id}, status=status.HTTP_200_OK)
 
-#Log Functions
-#   CreateLog(student, teacher, surah, starting_ayah, ending_ayah, passed, comments, dates, log_type)
-#   ReturnLogs(student, passed, starting_date, ending_date, log_type)
+class ReportCardListCreateView(generics.ListCreateAPIView):
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return CreateReportCardSerializer
+        return ReportCardSerializer
+ 
+    def get_queryset(self):
+        queryset = Report_Card.objects.all()
+ 
+        if self.request.method == "GET":
+            student_id = self.request.query_params.get("student")
+            if not student_id:
+                raise ValidationError({"student": "This query parameter is required."})
+            queryset = queryset.filter(student_id=student_id)
+ 
+            trimester = self.request.query_params.get("trimester")
+            if trimester:
+                queryset = queryset.filter(trimester=trimester)
+ 
+        return queryset.order_by("-date")
+ 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report_card = serializer.save()
+        return Response({"id": report_card.id}, status=status.HTTP_201_CREATED)
+ 
 
-# Creates Report Card for a date
-# Return report card of partciular year/trimester
 
 
 
@@ -127,17 +161,25 @@ class GetLogsView(generics.GenericAPIView):
             student_id = log.student_id
             if student_id not in result:
                 result[student_id] = []
-            result[student_id].append({
-                "id": log.log_id,
-                "date": log.date.isoformat(),
-                "surah": log.surah,
-                "surahName": quran_surahs[log.surah],
-                "ayahStart": log.ayah_init,
-                "ayahEnd": log.ayah_final,
-                "type": LOG_TYPE_MAP.get(log.log_type, 'reading'),
-                "behavior": log.comments,
-                "grade": "pass" if log.passed else "fail",
-            })
+            if log.attendance == 0:
+                result[student_id].append({
+                    "id": log.log_id,
+                    "date": log.date.isoformat(),
+                    "surah": log.surah,
+                    "surahName": quran_surahs[log.surah],
+                    "ayahStart": log.ayah_init,
+                    "ayahEnd": log.ayah_final,
+                    "type": LOG_TYPE_MAP.get(log.log_type, 'reading'),
+                    "behavior": log.behavior,
+                    "comments": log.comments,
+                    "grade": "pass" if log.passed else "fail",
+                })
+            else:
+                result[student_id].append({
+                    "id": log.log_id,
+                    "date": log.date.isoformat(),
+                    "attendance": log.attendance,
+                })
 
         return Response(result, status=status.HTTP_200_OK)
 

@@ -116,10 +116,7 @@ async function handleLogin() {
     );
 
     const accessToken = response.data.access;
-
     await AsyncStorage.setItem('authToken', accessToken);
-
-    // 🔥 THIS is the only navigation trigger you need
     setAuthenticated(true);
 
   } catch (error) {

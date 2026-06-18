@@ -70,13 +70,15 @@ class Log(models.Model):
     log_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="reading_log")
     logged_by = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="student_reading_log")
-    surah = models.IntegerField()
-    ayah_init = models.IntegerField()
-    ayah_final = models.IntegerField()
-    passed = models.BooleanField()
+    surah = models.IntegerField(null=True, blank=True)
+    ayah_init = models.IntegerField(null=True, blank=True)
+    ayah_final = models.IntegerField(null=True, blank=True)
+    passed = models.BooleanField(null=True, blank=True)
     comments = models.CharField(max_length=1000, null= True, blank= True)
     date = models.DateField()
-    log_type = models.IntegerField() # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+    behavior = models.IntegerField(default = 5,null=True, blank=True) 
+    attendance = models.IntegerField(default = 0) #0 - Present   1-Absent    2- Excused Absence
+    log_type = models.IntegerField(null=True, blank=True) # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
 
 
 class Behavior_Log(models.Model):
@@ -88,7 +90,6 @@ class Behavior_Log(models.Model):
 
 class Report_Card(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="report_card")
-    logged_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name="student_report_card")
     classroom = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="student_report_card")
     behavior_score= models.IntegerField()  #Out of 5
     reading_score = models.IntegerField()  #Out of 5

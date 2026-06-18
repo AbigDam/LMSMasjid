@@ -187,13 +187,15 @@ class BehaviorLogSerializer(serializers.ModelSerializer):
 class CreateLogSerializer(serializers.Serializer):
     student_id = serializers.IntegerField()
     class_id = serializers.IntegerField()
-    surah = serializers.IntegerField()
-    starting_ayah = serializers.IntegerField()
-    ending_ayah = serializers.IntegerField()
-    passed = serializers.BooleanField()
+    surah = serializers.IntegerField(required=False)
+    starting_ayah = serializers.IntegerField(required=False)
+    ending_ayah = serializers.IntegerField(required=False)
+    passed = serializers.BooleanField(required=False)
+    behavior = serializers.IntegerField(min_value=1, max_value=5, default=5)
+    attendance = serializers.IntegerField(min_value=0, max_value=2, default=0) #0 - Present   1-Absent    2- Excused Absence
     comments = serializers.CharField(required=False, allow_blank=True, default="")
     date = serializers.DateField(default=datetime.date.today)
-    log_type = serializers.IntegerField() # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+    log_type = serializers.IntegerField(required=False) # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
 
     def create(self, validated_data):
         student = Student.objects.get(student_id=validated_data["student_id"])
@@ -202,15 +204,18 @@ class CreateLogSerializer(serializers.Serializer):
         log = Log.objects.create(
             student=student,
             logged_by=classroom,
-            surah=validated_data["surah"],
-            ayah_init=validated_data["starting_ayah"],
-            ayah_final=validated_data["ending_ayah"],
-            passed=validated_data["passed"],
+            surah=validated_data.get("surah", None),
+            ayah_init=validated_data.get("starting_ayah", None),
+            ayah_final=validated_data.get("ending_ayah", None),
+            passed=validated_data.get("passed", None),
             comments=validated_data.get("comments", ""),
             date=validated_data["date"],
-            log_type=validated_data["log_type"],
+            behavior=validated_data.get("behavior", None),
+            log_type=validated_data.get("log_type", None),
+            attendance=validated_data.get("attendance", 0),
         )
         return log
+        
 # ── Student ──────────────────────────────────────────────────────────────────
 class StudentSerializer(serializers.ModelSerializer):
     # Check work???????
@@ -221,3 +226,61 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = ["id", "first_name", "last_name"]
+
+
+## Report Card ##
+SCORE_FIELDS = (
+    "behavior_score",
+    "reading_score",
+    "review_score",
+    "memorization_score",
+    "attendance_score",
+)
+
+class CreateReportCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report_Card
+        fields = [
+            "student",
+            "classroom",
+            "behavior_score",
+            "reading_score",
+            "review_score",
+            "memorization_score",
+            "attendance_score",
+            "trimester",
+            "date",
+        ]
+
+    def validate(self, data):
+        errors = {}
+
+        for field in SCORE_FIELDS:
+            value = data.get(field)
+            if value is not None and not (1 <= value <= 5):
+                errors[field] = "Must be between 1 and 5."
+
+        trimester = data.get("trimester")
+        if trimester is not None and not (1 <= trimester <= 3):
+            errors["trimester"] = "Must be between 1 and 3."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return data
+
+
+class ReportCardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report_Card
+        fields = [
+            "id",
+            "student",
+            "classroom",
+            "behavior_score",
+            "reading_score",
+            "review_score",
+            "memorization_score",
+            "attendance_score",
+            "trimester",
+            "date",
+        ]

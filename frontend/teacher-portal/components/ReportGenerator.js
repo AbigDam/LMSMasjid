@@ -6,16 +6,19 @@
 // project's central theme tokens instead of local overrides or useTheme.
 //
 // Props:
-//   studentId {number}   — passed through to the saved ReportCard payload
-//   logs      {array}    — full LogEntry array from the parent screen
-//
+//   studentId   {number}  — passed through to the saved ReportCard payload
+//   logs        {array}   — full LogEntry array from the parent screen
+//   classroomId {number}  — classroom//
 // Two tabs:
-//   Trimester Report — auto-computes scores from logs, teacher can adjust,
-//                      saves a local ReportCard (TODO: POST /api/report-card/)
-//   Custom Range     — date-filtered stats summary (TODO: GET /api/logs/summary/)
+//   Trimester Report — scores still auto-compute from logs (teacher can
+//                      adjust), but report cards are now loaded with
+//                      GET /api/report-card/ and saved with
+//                      POST /api/report-card/ instead of local mock state.
+//   Custom Range     — date-filtered stats summary, computed entirely from
+//                      the logs already on hand — no backend call needed.
 // -----------------------------------------------------------------------------
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   ScrollView,
@@ -53,7 +56,78 @@ const ext = {
 const AYAHS_PER_PAGE = 15;
 
 // ---------------------------------------------------------------------------
-// Score + stat computation helpers
+// Backend helpers
+// TODO: point this at your real API host, or swap these for your existing
+// api client (axios instance / fetch wrapper with auth headers) if the
+// project already has one.
+// ---------------------------------------------------------------------------
+const DEFAULT_API_BASE_URL = "http://localhost:8000" 
+
+
+function normalizeList(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.results)) return data.results; // DRF-style pagination
+  return [];
+}
+
+// Reads the response as text first instead of calling res.json() directly.
+// If the body isn't valid JSON (an HTML 404/500 page, an empty 204, the
+// wrong host entirely, etc.) this throws a message that actually says what
+// came back, instead of "JSON.parse: unexpected character at line 1 column 1".
+async function parseJsonResponse(res) {
+  const text = await res.text();
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const snippet = text.slice(0, 140).replace(/\s+/g, ' ').trim();
+      throw new Error(
+        `Server returned ${res.status} ${res.statusText || ''} and a non-JSON body` +
+        (snippet ? `: "${snippet}${text.length > 140 ? '…' : ''}"` : ' (empty).')
+      );
+    }
+  }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function firstErrorMessage(data, fallback) {
+  if (data && typeof data === 'object') {
+    const [field, value] = Object.entries(data)[0] || [];
+    const message = Array.isArray(value) ? value[0] : value;
+    if (message) return field && field !== 'detail' ? `${field}: ${message}` : String(message);
+  }
+  return fallback;
+}
+
+async function fetchReportCards(baseUrl, studentId) {
+  const res = await fetch(`${baseUrl}/api/report-card/?student=${studentId}`, {
+    // TODO: attach an Authorization header here if your API requires one
+  });
+  const { ok, status, data } = await parseJsonResponse(res);
+  if (!ok) {
+    throw new Error(firstErrorMessage(data, `Could not load past report cards (status ${status}).`));
+  }
+  return normalizeList(data).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+async function createReportCard(baseUrl, payload) {
+  const res = await fetch(`${baseUrl}/api/report-card/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const { ok, status, data } = await parseJsonResponse(res);
+  if (!ok) {
+    throw new Error(firstErrorMessage(data, `Failed to save report card (status ${status}).`));
+  }
+  // The backend only returns the new id (matching CreateLogView's
+  // convention), so build the full record locally from what we just sent.
+  return { id: data && data.id, ...payload };
+}
+
+// ---------------------------------------------------------------------------
+// Score + stat computation helpers (all local — no backend needed)
 // ---------------------------------------------------------------------------
 function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
 
@@ -81,16 +155,20 @@ function computeScores(logs) {
 }
 
 function computeStats(logs) {
-  const present    = logs.filter(l => l.attendance !== 'Absent' && l.attendance !== 'Excused Absence');
-  const absent_days = logs.filter(l => l.attendance === 'Absent' || l.attendance === 'Excused Absence').length;
+  const present     = logs.filter(l => l.attendance !== 1 && l.attendance !== 2);
+  const absent_days = logs.filter(l => l.attendance === 1 || l.attendance === 2).length;
 
-  let total_ayahs = 0;
-  const surahMap  = {};
+  let total_ayahs_memorized = 0;
+  let total_ayahs_reviewed  = 0;
+  const surahMap = {};
 
   for (const log of present) {
     if (log.ayahStart != null && log.ayahEnd != null && log.surahName) {
       const ayahs = log.ayahEnd - log.ayahStart + 1;
-      total_ayahs += ayahs;
+
+      if (log.type === 'memorization') total_ayahs_memorized += ayahs;
+      else if (log.type === 'review')  total_ayahs_reviewed  += ayahs;
+
       if (!surahMap[log.surahName]) {
         surahMap[log.surahName] = { surahName: log.surahName, surah: log.surah ?? 0, ayahs: 0, sessions: 0 };
       }
@@ -99,9 +177,10 @@ function computeStats(logs) {
     }
   }
 
+
   return {
-    total_ayahs,
-    total_pages:            parseFloat((total_ayahs / AYAHS_PER_PAGE).toFixed(1)),
+    total_ayahs_memorized,
+    total_ayahs_reviewed,
     total_sessions:         present.length,
     memorization_sessions:  present.filter(l => l.type === 'memorization').length,
     review_sessions:        present.filter(l => l.type === 'review').length,
@@ -243,11 +322,13 @@ function ReportCardModal({ report, onClose }) {
 // ---------------------------------------------------------------------------
 // Trimester tab
 // ---------------------------------------------------------------------------
-function TrimesterTab({ studentId, logs }) {
+function TrimesterTab({ studentId, logs, classroomId, apiBaseUrl }) {
+  const baseUrl = apiBaseUrl || DEFAULT_API_BASE_URL;
   const today = new Date().toISOString().split('T')[0];
+
   const [trimester,  setTrimester]  = useState(1);
   const [reportDate, setReportDate] = useState(today);
-  const [isLoading,  setIsLoading]  = useState(false);
+  const [isSaving,   setIsSaving]   = useState(false);
   const [error,      setError]      = useState(null);
 
   const auto  = useMemo(() => computeScores(logs), [logs]);
@@ -259,11 +340,36 @@ function TrimesterTab({ studentId, logs }) {
   const [memorizationScore, setMemorizationScore] = useState(auto.memorization_score);
   const [attendanceScore,   setAttendanceScore]   = useState(auto.attendance_score);
 
-  const [savedReports,  setSavedReports]  = useState([]);
-  const [viewingReport, setViewingReport] = useState(null);
+  // Past report cards now come from the backend instead of local-only state.
+  const [savedReports,     setSavedReports]     = useState([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(true);
+  const [loadError,        setLoadError]        = useState(null);
+  const [viewingReport,    setViewingReport]    = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadReportCards() {
+      setIsLoadingReports(true);
+      setLoadError(null);
+      try {
+        const reports = await fetchReportCards(baseUrl, studentId);
+        if (!cancelled) setSavedReports(reports);
+      } catch (e) {
+        if (!cancelled) setLoadError(e.message || 'Could not load past report cards.');
+      } finally {
+        if (!cancelled) setIsLoadingReports(false);
+      }
+    }
+
+    if (studentId != null) loadReportCards();
+    return () => { cancelled = true; };
+  }, [studentId, baseUrl]);
 
   function refill() {
     // TODO: replace with GET /api/report-card/generate/?student=<id>&trimester=<n>
+    // once the backend exposes a scoring endpoint — for now scores are derived
+    // locally from `logs` via computeScores().
     setBehaviorScore(auto.behavior_score);
     setReadingScore(auto.reading_score);
     setReviewScore(auto.review_score);
@@ -275,18 +381,30 @@ function TrimesterTab({ studentId, logs }) {
 
   async function handleSave() {
     setError(null);
-    setIsLoading(true);
-    // TODO: replace mock with POST /api/report-card/
-    await new Promise(r => setTimeout(r, 500));
-    const saved = {
-      id: Date.now(), student: studentId,
-      logged_by: 0, classroom: 0,    // TODO: inject from auth context
-      behavior_score: behaviorScore, reading_score: readingScore,
-      review_score: reviewScore, memorization_score: memorizationScore,
-      attendance_score: attendanceScore, trimester, date: reportDate,
+    setIsSaving(true);
+
+    const payload = {
+      student: studentId,
+      behavior_score: behaviorScore,
+      reading_score: readingScore,
+      review_score: reviewScore,
+      memorization_score: memorizationScore,
+      attendance_score: attendanceScore,
+      trimester,
+      date: reportDate,
     };
-    setSavedReports(prev => [saved, ...prev]);
-    setIsLoading(false);
+    // Only sent if the parent screen has them on hand — otherwise the backend
+    // is expected to derive these from the authenticated request.
+    if (classroomId != null) payload.classroom = classroomId;
+
+    try {
+      const saved = await createReportCard(baseUrl, payload);
+      setSavedReports(prev => [saved, ...prev]);
+    } catch (e) {
+      setError(e.message || 'Something went wrong while saving the report card.');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const scores = [
@@ -300,33 +418,46 @@ function TrimesterTab({ studentId, logs }) {
   return (
     <View>
       {/* Past report cards */}
-      {savedReports.length > 0 && (
-        <View style={{ marginBottom: spacing.md }}>
-          <SectionLabel text="Past Report Cards" />
-          {savedReports.map(r => (
-            <TouchableOpacity
-              key={r.id}
-              style={s.pastCard}
-              onPress={() => setViewingReport(r)}
-              activeOpacity={0.75}
-            >
-              <View style={s.pastCardLeft}>
-                <View style={s.trimBadge}>
-                  <Text style={s.trimBadgeText}>T{r.trimester}</Text>
-                </View>
-                <View>
-                  <Text style={s.pastCardDate}>{r.date}</Text>
-                  <Text style={s.pastCardAvg}>
-                    Avg {((r.behavior_score + r.reading_score + r.review_score +
-                           r.memorization_score + r.attendance_score) / 5).toFixed(1)}/5
-                  </Text>
-                </View>
+      <View style={{ marginBottom: spacing.md }}>
+        <SectionLabel text="Past Report Cards" />
+
+        {isLoadingReports && (
+          <Text style={s.helperText}>Loading past report cards…</Text>
+        )}
+
+        {loadError && (
+          <View style={[s.errorBox, { backgroundColor: ext.redLight }]}>
+            <Text style={[s.errorText, { color: ext.red }]}>{loadError}</Text>
+          </View>
+        )}
+
+        {!isLoadingReports && !loadError && savedReports.length === 0 && (
+          <Text style={s.helperText}>No report cards saved yet.</Text>
+        )}
+
+        {!isLoadingReports && savedReports.map(r => (
+          <TouchableOpacity
+            key={r.id}
+            style={s.pastCard}
+            onPress={() => setViewingReport(r)}
+            activeOpacity={0.75}
+          >
+            <View style={s.pastCardLeft}>
+              <View style={s.trimBadge}>
+                <Text style={s.trimBadgeText}>T{r.trimester}</Text>
               </View>
-              <Text style={s.pastCardChevron}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+              <View>
+                <Text style={s.pastCardDate}>{r.date}</Text>
+                <Text style={s.pastCardAvg}>
+                  Avg {((r.behavior_score + r.reading_score + r.review_score +
+                         r.memorization_score + r.attendance_score) / 5).toFixed(1)}/5
+                </Text>
+              </View>
+            </View>
+            <Text style={s.pastCardChevron}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Info banner */}
       <View style={[s.infoBox, { backgroundColor: ext.blueLight, borderColor: '#93C5FD' }]}>
@@ -358,13 +489,20 @@ function TrimesterTab({ studentId, logs }) {
 
       <SectionLabel text="Quran Progress This Trimester" />
       <View style={s.chipRow}>
-        <StatChip label="Total Ayahs" value={stats.total_ayahs} sub={`${stats.total_pages} pages`} />
         <StatChip label="Sessions"    value={stats.total_sessions} />
         <StatChip label="Absent Days" value={stats.absent_days} />
       </View>
       <View style={s.chipRow}>
-        <StatChip label="Memorization" value={stats.memorization_sessions} />
-        <StatChip label="Review"       value={stats.review_sessions} />
+        <StatChip
+          label="Ayahs Memorized"
+          value={stats.total_ayahs_memorized}
+          sub={`${stats.memorization_sessions} sessions`}
+        />
+        <StatChip
+          label="Ayahs Reviewed"
+          value={stats.total_ayahs_reviewed}
+          sub={`${stats.review_sessions} sessions`}
+        />
       </View>
 
       {stats.surah_breakdown.length > 0 && (
@@ -381,11 +519,11 @@ function TrimesterTab({ studentId, logs }) {
       )}
 
       <TouchableOpacity
-        style={[s.submitBtn, isLoading && s.submitBtnDisabled]}
+        style={[s.submitBtn, isSaving && s.submitBtnDisabled]}
         onPress={handleSave}
-        disabled={isLoading}
+        disabled={isSaving}
       >
-        <Text style={s.submitBtnText}>{isLoading ? 'Saving…' : 'Save Report Card'}</Text>
+        <Text style={s.submitBtnText}>{isSaving ? 'Saving…' : 'Save Report Card'}</Text>
       </TouchableOpacity>
 
       {viewingReport && (
@@ -437,7 +575,8 @@ function CustomRangeTab({ logs }) {
     setError(null);
     if (!dateFrom || !dateTo) { setError('Please enter both a start and end date.'); return; }
     if (dateFrom > dateTo)    { setError('Start date must be before end date.'); return; }
-    // TODO: replace with GET /api/logs/summary/?student=<id>&date_from=<>&date_to=<>
+    // This stays local — it's just a date filter + the same computeStats()
+    // already used above, so there's nothing the backend needs to do here.
     const filtered = logs.filter(l => l.date >= dateFrom && l.date <= dateTo);
     setSummary({ ...computeStats(filtered), date_from: dateFrom, date_to: dateTo });
   }
@@ -484,13 +623,20 @@ function CustomRangeTab({ logs }) {
             <Text style={s.rangeHeaderDates}>{summary.date_from}  →  {summary.date_to}</Text>
           </View>
           <View style={s.chipRow}>
-            <StatChip label="Total Ayahs" value={summary.total_ayahs} sub={`${summary.total_pages} pages`} />
             <StatChip label="Sessions"    value={summary.total_sessions} />
             <StatChip label="Absent Days" value={summary.absent_days} />
           </View>
           <View style={s.chipRow}>
-            <StatChip label="Memorization" value={summary.memorization_sessions} />
-            <StatChip label="Review"       value={summary.review_sessions} />
+            <StatChip
+              label="Ayahs Memorized"
+              value={summary.total_ayahs_memorized}
+              sub={`${summary.memorization_sessions} sessions`}
+            />
+            <StatChip
+              label="Ayahs Reviewed"
+              value={summary.total_ayahs_reviewed}
+              sub={`${summary.review_sessions} sessions`}
+            />
           </View>
           {summary.surah_breakdown.length > 0 && (
             <View>
@@ -510,7 +656,7 @@ function CustomRangeTab({ logs }) {
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
-export function ReportGenerator({ studentId, logs }) {
+export function ReportGenerator({ studentId, logs, classroomId, apiBaseUrl }) {
   const [activeTab, setActiveTab] = useState('trimester');
 
   return (
@@ -534,7 +680,14 @@ export function ReportGenerator({ studentId, logs }) {
       </View>
 
       {activeTab === 'trimester'
-        ? <TrimesterTab studentId={studentId} logs={logs} />
+        ? (
+          <TrimesterTab
+            studentId={studentId}
+            logs={logs}
+            classroomId={classroomId}
+            apiBaseUrl={apiBaseUrl}
+          />
+        )
         : <CustomRangeTab logs={logs} />
       }
     </View>
@@ -585,6 +738,13 @@ const s = StyleSheet.create({
   // Info box
   infoBox:  { marginBottom: spacing.sm, padding: spacing.md, borderRadius: radii.md, borderWidth: 1 },
   infoText: { fontSize: fonts.sizes.body, lineHeight: 18 },
+
+  // Helper / empty-state text
+  helperText: {
+    fontSize: fonts.sizes.body,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
 
   // Scores card
   scoresCard: {
