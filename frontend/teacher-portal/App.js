@@ -60,8 +60,6 @@ function AppStack({ user, userError, onRetryUser }) {
     App();
   }
 
-  
-
   switch (user.role_id) {
     case 1: // Teacher
       return (
@@ -153,38 +151,6 @@ export default function App() {
   
   }, [authenticated]);
 
-  // useEffect(() => {
-  //   async function checkAuth() {
-  //     try {
-  //       const token = await AsyncStorage.getItem('authToken');
-  //       setAuthenticated(!!token);
-
-  //       //Stores current user info in global variable for navigating between different screens depending on user role (teacher vs admin).
-  //       if (token)
-  //       {
-  //         const response = await axios.get(
-  //           'http://127.0.0.1:8000/api/current_user/',
-  //         {
-  //           headers: {
-  //             Authorization: `Bearer ${token}`,
-  //           },
-  //         }
-  //         );
-  //         setUser(response.data);
-  //       }
-        
-  //     } catch (err) {
-  //       console.error('Auth check failed:', err);
-  //       setAuthenticated(false);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-      
-  //   }
-
-  //   checkAuth();
-  // }, []);
-
   if (loading) return <LoadingScreen label="Signing you in…" />;
 
   
@@ -205,8 +171,6 @@ export default function App() {
         ) : (
           <AuthStack />
         )}
-              
-          {/* {authenticated ? <AppStack user={user} userError={userError} onRetryUser={checkAuth} /> : <AuthStack />} */}
 
         </NavigationContainer>
       </SafeAreaProvider>
