@@ -265,7 +265,6 @@ useEffect(() => {
           <View style={styles.metricsContainerGrid}>
             <LargeStatCard icon="account-multiple" value={totalStudents} label="Enrolled Students" />
             <LargeStatCard icon="school" value={classCount} label="Active Class Sections" />
-            <LargeStatCard icon="clock-start" value={nextClass?.schedule?.split(' - ')[0] ?? '—'} label="Next Session" />
           </View>
 
           {/* Central Section Grid Layout */}

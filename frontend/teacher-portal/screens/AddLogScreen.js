@@ -45,7 +45,7 @@ const ATTENDANCE_LABELS = {
   2: 'Excused Absence',
 };
 function LogDetailView({ log, onEdit, viewHistory }) {
-  const isAbsent = log.attendance === 1 || log.attendance === 2;
+  const isAbsent = log.attendance === 1 || log.attendance === 2 || log.attendance === 'Absent' || log.attendance === 'Excused Absence';
   return (
     <View>
       <View style={styles.loggedBanner}>
@@ -55,11 +55,11 @@ function LogDetailView({ log, onEdit, viewHistory }) {
 
       <View style={styles.detailCard}>
         {isAbsent ?
-        (<DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] } bold />) 
+        (<DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] ?? log.attendance} bold />) 
             : 
           (
             <>
-            <DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] } />
+            <DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] ?? log.attendance} />
             <DetailRow
               label="Surah & Ayahs"
               value={`${log.surahName} · Ayahs ${log.ayahStart}–${log.ayahEnd}`}

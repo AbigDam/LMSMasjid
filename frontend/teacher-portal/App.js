@@ -66,6 +66,7 @@ function AppStack({ user, userError, onRetryUser }) {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="AddLog" component={AddLogScreen} />
+           <Stack.Screen name="StudentRoster" component={StudentViewScreen} />
         </Stack.Navigator>
       );
     case 3: // Admin
