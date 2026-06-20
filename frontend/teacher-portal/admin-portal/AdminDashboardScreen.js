@@ -96,7 +96,7 @@ export default function DashboardScreen({ navigation }) {
         const token = await AsyncStorage.getItem('authToken');
 
         const response = await axios.get(
-          'http://127.0.0.1:8000/api/admin/classes/',
+          'https://lmsmasjid-backend.onrender.com/api/admin/classes/',
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -120,7 +120,7 @@ useEffect(() => {
       const token = await AsyncStorage.getItem('authToken');
 
       const response = await axios.get(
-        'http://127.0.0.1:8000/api/current_user/',
+        'https://lmsmasjid-backend.onrender.com/api/current_user/',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -139,7 +139,7 @@ useEffect(() => {
 
 
 useEffect(() => {
-  axios.get("http://127.0.0.1:8000/api/announcements/", {
+  axios.get("https://lmsmasjid-backend.onrender.com/api/announcements/", {
   })
   .then(res => {
     setAnnouncements(res.data);

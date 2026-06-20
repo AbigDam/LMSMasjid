@@ -255,7 +255,7 @@ export default function AddLogScreen({ navigation, route }) {
         const token = await AsyncStorage.getItem('authToken');
 
         const response = await axios.get(
-          `http://127.0.0.1:8000/api/select_students/${course.id}/`,
+          `https://lmsmasjid-backend.onrender.com/api/select_students/${course.id}/`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

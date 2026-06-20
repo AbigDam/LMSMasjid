@@ -56,10 +56,6 @@ function AppStack({ user, userError, onRetryUser }) {
     return <AppLoadError message={userError} onRetry={onRetryUser} />;
   }
 
-  if (!user) {
-    App();
-  }
-
   switch (user.role_id) {
     case 1: // Teacher
       return (
@@ -109,7 +105,7 @@ export default function App() {
       if (isAuthed) {
         try {
           const response = await axios.get(
-            'http://127.0.0.1:8000/api/current_user/',
+            'https://lmsmasjid-backend.onrender.com/api/current_user/',
             { headers: { Authorization: `Bearer ${token}` } }
           );
           setUser(response.data);
@@ -152,7 +148,7 @@ export default function App() {
   
   }, [authenticated]);
 
-  if (loading) return <LoadingScreen label="Signing you in…" />;
+  if (loading) return <LoadingScreen label="Fetching login…" />;
 
   
   return (
