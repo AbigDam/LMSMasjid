@@ -549,7 +549,7 @@ async function handleAddLog(newLog) {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.xl }}
             >
-              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl = "https://lmsmasjid-backend.onrender.com/"/>
+              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl = "https://lmsmasjid-backend.onrender.com"/>
             </ScrollView>
           </View>
         </View>
