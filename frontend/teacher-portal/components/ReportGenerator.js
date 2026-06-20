@@ -132,16 +132,15 @@ async function createReportCard(baseUrl, payload) {
 function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
 
 function computeScores(logs) {
-  const present = logs.filter(l => l.attendance !== 'Absent' && l.attendance !== 'Excused Absence');
+  const present = logs.filter(l => l.attendance !== 'Absent' && l.attendance !== 'Excused Absence'&& l.attendance !== 1&& l.attendance !== 2);
   const total   = logs.length;
   const memLogs = present.filter(l => l.type === 'memorization');
   const revLogs = present.filter(l => l.type === 'review');
-
   const attendance_score = total > 0
     ? clamp(Math.round((present.length / total) * 5), 1, 5) : 3;
 
   const behavior_score = present.length > 0
-    ? clamp(Math.round(present.reduce((a, l) => a + l.behavior, 0) / present.length), 1, 5) : 3;
+    ? clamp(Math.round(present.reduce((a, l) => a + l.behavior, 0) / present.length), 1, 5) : 5;
 
   const memorization_score = memLogs.length > 0
     ? clamp(Math.round((memLogs.filter(l => l.grade === 'pass').length / memLogs.length) * 5), 1, 5) : 3;
