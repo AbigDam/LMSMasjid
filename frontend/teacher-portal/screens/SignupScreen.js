@@ -70,7 +70,7 @@ function validate(trimmedFirstName, trimmedLastName, trimmedEmail) {
 
   return next;
 }
-const API_URL = 'http://127.0.0.1:8000/';
+const API_URL = 'https://lmsmasjid-backend.onrender.com/';
 
 const { setAuthenticated } = useAuth();
 

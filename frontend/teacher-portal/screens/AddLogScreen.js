@@ -197,7 +197,7 @@ async function handleAddLog(newLog) {
     log_type: logTypeMap[newLog.type],
   };
 
-  const response = await fetch(`http://127.0.0.1:8000/api/create_log/`, {
+  const response = await fetch(`https://lmsmasjid-backend.onrender.com/api/create_log/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -242,7 +242,7 @@ async function handleAddLog(newLog) {
     };
 
     const token = await AsyncStorage.getItem('authToken');
-    const response = await fetch(`http://127.0.0.1:8000/api/update_log/`, {
+    const response = await fetch(`https://lmsmasjid-backend.onrender.com/api/update_log/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -269,7 +269,7 @@ async function handleAddLog(newLog) {
   async function handleDeleteLog(logId) {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`http://127.0.0.1:8000/api/delete_log/`, {
+      const response = await fetch(`https://lmsmasjid-backend.onrender.com/api/delete_log/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -549,7 +549,7 @@ async function handleAddLog(newLog) {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.xl }}
             >
-              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl = "http://127.0.0.1:8000/"/>
+              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl = "https://lmsmasjid-backend.onrender.com/"/>
             </ScrollView>
           </View>
         </View>
