@@ -88,10 +88,7 @@ class UpdateLogView(generics.GenericAPIView):
     def get_object(self):
         return get_object_or_404(
             Log,
-            student_id=self.request.data.get('student_id'),
-            logged_by=self.request.data.get('class_id'),
-            log_type=self.request.data.get('log_type'),
-            date=self.request.data.get('date'),
+            log_id = self.request.data.get('log_id')
         )
 
     def post(self, request, *args, **kwargs):
@@ -116,6 +113,23 @@ class UpdateLogView(generics.GenericAPIView):
             instance.attendance = request.data.get('attendance')
             instance.save()
         
+        return Response({"id": instance.log_id}, status=status.HTTP_200_OK)
+
+
+class DeleteLogView(generics.GenericAPIView):
+    serializer_class = CreateLogSerializer
+
+    def get_object(self):
+        return get_object_or_404(
+            Log,
+            log_id = self.request.data.get('log_id')
+        )
+
+    def post(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        instance.delete()
+
         return Response({"id": instance.log_id}, status=status.HTTP_200_OK)
 
 class ReportCardListCreateView(generics.ListCreateAPIView):

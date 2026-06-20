@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import {
   Modal,
@@ -87,13 +86,15 @@ function LogDetailView({ log, onEdit, viewHistory }) {
         )}
       </View>
 
+      {/* Edit Log button removed per request — handler kept below, commented out.
       <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
         <Ionicons name="pencil-outline" size={15} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
         <Text style={styles.editBtnText}>Edit Log</Text>
       </TouchableOpacity>
+      */}
       <TouchableOpacity style={styles.viewHistoryBtn} onPress={viewHistory}>
         <Ionicons name="time-outline" size={17} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
-        <Text style={styles.viewHistoryBtnText}>View Log History</Text>
+        <Text style={styles.viewHistoryBtnText}>View/Edit Log History</Text>
       </TouchableOpacity>
     </View>
   );
@@ -140,12 +141,15 @@ export default function AddLogScreen({ navigation, route }) {
   const [isEditing,    setIsEditing]     = useState(false);
   const [viewingHistory, setViewingHistory] = useState(false);
   const [viewingReport, setViewingReport]   = useState(false);
+  const [addingLog, setAddingLog] = useState(false);
+  const [editingLogId, setEditingLogId] = useState(null); // id of the historical log currently being edited, or null
 
   const studentLogs     = allLogs[selectedId] ?? [];
   const todayLog        = getTodayLog(studentLogs);
+  const editingLog      = editingLogId ? studentLogs.find(l => l.id === editingLogId) ?? null : null;
 
-  // Show the form when: no log today, OR teacher clicked Edit.
-  const showForm = !todayLog || isEditing;
+  // Show the form when: no log today, OR teacher clicked Edit on a history row, OR teacher clicked "Add Log".
+  const showForm = !todayLog || !!editingLogId || addingLog;
 
   //Load Students
 
@@ -175,6 +179,8 @@ export default function AddLogScreen({ navigation, route }) {
     setSelectedId(id);
     setIsEditing(false);   // reset edit state when switching students
     setViewingHistory(false);
+    setAddingLog(false);
+    setEditingLogId(null);
     setReportExpanded(false);
   }
 
@@ -216,9 +222,12 @@ async function handleAddLog(newLog) {
   }));
   setIsEditing(false);
   setViewingHistory(false);
+  setAddingLog(false);
 }
 
-  async function handleUpdateLog(updatedFields) {
+  // Edit Log handler — now takes the specific logId being edited (from the history row),
+  // rather than assuming it's always today's log.
+  async function handleUpdateLog(logId, updatedFields) {
     const logTypeMap = {
       'memorization': 1,
       'review': 2,
@@ -226,6 +235,7 @@ async function handleAddLog(newLog) {
     };
 
     const payload = {
+      log_id: logId,
       student_id: selectedId,
       class_id: course.id,
       surah: updatedFields.surah,
@@ -234,29 +244,59 @@ async function handleAddLog(newLog) {
       passed: updatedFields.grade === 'pass',
       comments: updatedFields.comments ?? '',
       behavior: updatedFields.behavior,
-      date: TODAY,
       log_type: logTypeMap[updatedFields.type],
       attendance: updatedFields.attendance === 'Absent' ? 1 : (updatedFields.attendance === 'Excused Absence' ? 2 : 0),
     };
+
+    const token = await AsyncStorage.getItem('authToken');
     const response = await fetch(`http://127.0.0.1:8000/api/update_log/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      console.error('Failed to create log', await response.text());
+      console.error('Failed to update log', await response.text());
       return;
     }
-    const { id } = await response.json();
-    const entry = { id, date: TODAY, ...updatedFields };
+
     setAllLogs(prev => ({
       ...prev,
       [selectedId]: (prev[selectedId] ?? []).map(l =>
-                l.id === todayLog.id ? { ...l, ...updatedFields } : l),
-          }));
+        l.id === logId ? { ...l, ...updatedFields } : l),
+    }));
     setIsEditing(false);
+    setEditingLogId(null);
     setViewingHistory(false);
+  }
+
+  async function handleDeleteLog(logId) {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`http://127.0.0.1:8000/api/delete_log/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ log_id: logId }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to delete log', await response.text());
+        return;
+      }
+
+      setAllLogs(prev => ({
+        ...prev,
+        [selectedId]: (prev[selectedId] ?? []).filter(l => l.id !== logId),
+      }));
+    } catch (error) {
+      console.error(error);
+    }
   }
 
  
@@ -303,12 +343,30 @@ async function handleAddLog(newLog) {
 
             <Text style={styles.subtext}>
               {showForm
-                ? isEditing ? "Editing today's log" : 'No log yet — record now'
+                ? editingLogId
+                  ? `Editing log from ${editingLog?.date ?? ''}`
+                  : addingLog
+                    ? 'Adding a new log'
+                    : 'No log yet — record now'
                 : "Today's session"}
             </Text>
 
             {!showForm && (
               <View style={styles.inlineButtonRow}>
+
+                {/* Add Log Button Trigger — always available, opens a fresh blank form */}
+                <TouchableOpacity
+                  style={styles.inlineRowBtn}
+                  onPress={() => setAddingLog(true)}
+                >
+                  <MaterialCommunityIcons
+                    name="plus"
+                    size={16}
+                    color={colors.textOnPrimary}
+                    style={{ marginRight: spacing.xs }}
+                  />
+                  <Text style={styles.inlineRowBtnText}>Add Log</Text>
+                </TouchableOpacity>
 
                 {/* Report Generator Button Trigger */}
                 <TouchableOpacity 
@@ -338,17 +396,17 @@ async function handleAddLog(newLog) {
         <View style={styles.panelCard}>
           {showForm ? (
             <AddLogForm
-              onSubmit={isEditing ? handleUpdateLog : handleAddLog}
-              initialData={isEditing && todayLog ? {
-                attendance:  todayLog.attendance || 'Present',
-                surah:       todayLog.surah,
-                surahName:   todayLog.surahName,
-                ayahStart:   todayLog.ayahStart,
-                ayahEnd:     todayLog.ayahEnd,
-                type:        todayLog.type,
-                grade:       todayLog.grade || 'pass',
-                behavior:    todayLog.behavior,
-                assignments: todayLog.assignments,
+              onSubmit={editingLogId ? (fields) => handleUpdateLog(editingLogId, fields) : handleAddLog}
+              initialData={editingLog ? {
+                attendance:  editingLog.attendance || 'Present',
+                surah:       editingLog.surah,
+                surahName:   editingLog.surahName,
+                ayahStart:   editingLog.ayahStart,
+                ayahEnd:     editingLog.ayahEnd,
+                type:        editingLog.type,
+                grade:       editingLog.grade || 'pass',
+                behavior:    editingLog.behavior,
+                assignments: editingLog.assignments,
               } : undefined}
             />
           ) : (
@@ -359,6 +417,18 @@ async function handleAddLog(newLog) {
             />
           )}
         </View>
+
+        {(addingLog || editingLogId) && (
+          <TouchableOpacity
+            style={styles.cancelAddBtn}
+            onPress={() => {
+              setAddingLog(false);
+              setEditingLogId(null);
+            }}
+          >
+            <Text style={styles.cancelAddBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
@@ -395,17 +465,41 @@ async function handleAddLog(newLog) {
                 studentLogs.map((log) => (
                   <View key={log.id} style={styles.historyCard}>
                     <View style={styles.historyCardHeader}>
-                      <Text style={styles.historyDate}>{log.date}</Text>
-                      <View style={[
-                        styles.historyBadge, 
-                        { backgroundColor: log.grade === 'pass' ? colors.successBg : colors.dangerBg }
-                      ]}>
-                        <Text style={[
-                          styles.historyBadgeText, 
-                          { color: log.grade === 'pass' ? colors.success : colors.danger }
+                      <Text style={styles.historyDate}>{log.date} ({log.type}) ({log.surahName})</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                        <View style={[
+                          styles.historyBadge, 
+                          { backgroundColor: log.grade === 'pass' ? colors.successBg : colors.dangerBg }
                         ]}>
-                          {log.attendance === 'Absent' ? 'ABSENT' : log.grade?.toUpperCase()}
-                        </Text>
+                          <Text style={[
+                            styles.historyBadgeText, 
+                            { color: log.grade === 'pass' ? colors.success : colors.danger }
+                          ]}>
+                            {log.attendance === 'Absent' ? 'ABSENT' : log.grade?.toUpperCase()}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditingLogId(log.id);
+                            setAddingLog(false);
+                            setViewingHistory(false);
+                          }}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel="Edit log"
+                          style={styles.editLogBtn}
+                        >
+                          <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteLog(log.id)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel="Delete log"
+                          style={styles.deleteLogBtn}
+                        >
+                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                        </TouchableOpacity>
                       </View>
                     </View>
 
@@ -710,6 +804,23 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
     fontSize: fonts.sizes.body,
     fontWeight: '700',
+  },
+  cancelAddBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+  },
+  cancelAddBtnText: {
+    color: colors.textMuted,
+    fontSize: fonts.sizes.body,
+    fontWeight: '600',
+  },
+  deleteLogBtn: {
+    padding: spacing.xs,
+  },
+  editLogBtn: {
+    padding: spacing.xs,
   },
   modalOverlay: {
     flex: 1,

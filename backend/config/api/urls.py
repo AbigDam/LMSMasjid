@@ -18,6 +18,8 @@ urlpatterns = [
     path("select_students/<int:class_id>/", StudentListView.as_view(), name="student_list"),
     path("create_log/", CreateLogView.as_view(), name="create_log"),
     path("update_log/", UpdateLogView.as_view(), name='update_log'),
+    path("delete_log/", DeleteLogView.as_view(), name='delete_log'),
+
     path("get_logs/", GetLogsView.as_view(), name='get_logs'),
     path("report-card/", ReportCardListCreateView.as_view(), name="report-card-list-create"),
     

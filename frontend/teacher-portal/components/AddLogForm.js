@@ -350,7 +350,7 @@ export function AddLogForm({ onSubmit, initialData }) {
       {/* ── Pickers ── */}
       <PickerModal
         visible={surahModalVisible}
-        items={quranSurahs}
+        items={quranSurahs.toReversed()}
         labelFn={s2 => `${s2.number}. ${s2.name}`}
         onSelect={s2 => { setSelectedSurah(s2); setAyahStart(null); setAyahEnd(null); }}
         onClose={() => setSurahModalVisible(false)}
