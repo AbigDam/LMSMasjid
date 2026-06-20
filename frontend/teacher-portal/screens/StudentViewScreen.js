@@ -18,8 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-
+import api from '../api.js'
 import { brand }                                 from '../constants/brand';
 import { colors, radii, shadow, spacing }        from '../constants/theme';
 
@@ -73,15 +72,7 @@ const fetchStudents = useCallback(async () => {
   setError(null);
   try {
     const token = await AsyncStorage.getItem('authToken');
-
-    const response = await axios.get(
-      `https://lmsmasjid-backend.onrender.com/api/select_students/${course.id}/`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const response = await api.get(`/select_students/${course.id}/`);
     setStudents(response.data);
   } catch (err) {
     console.error(err);

@@ -61,8 +61,6 @@ const AYAHS_PER_PAGE = 15;
 // api client (axios instance / fetch wrapper with auth headers) if the
 // project already has one.
 // ---------------------------------------------------------------------------
-const DEFAULT_API_BASE_URL = "http://localhost:8000" 
-
 
 function normalizeList(data) {
   if (Array.isArray(data)) return data;
@@ -81,10 +79,10 @@ async function parseJsonResponse(res) {
     try {
       data = JSON.parse(text);
     } catch {
-      const snippet = text.slice(0, 140).replace(/\s+/g, ' ').trim();
+      const snippet = text.slice(0, 500).replace(/\s+/g, ' ').trim();
       throw new Error(
         `Server returned ${res.status} ${res.statusText || ''} and a non-JSON body` +
-        (snippet ? `: "${snippet}${text.length > 140 ? '…' : ''}"` : ' (empty).')
+        (snippet ? `: "${snippet}${text.length > 500 ? '…' : ''}"` : ' (empty).')
       );
     }
   }
@@ -118,6 +116,8 @@ async function createReportCard(baseUrl, payload) {
     body: JSON.stringify(payload),
   });
   const { ok, status, data } = await parseJsonResponse(res);
+
+  
   if (!ok) {
     throw new Error(firstErrorMessage(data, `Failed to save report card (status ${status}).`));
   }
@@ -131,31 +131,45 @@ async function createReportCard(baseUrl, payload) {
 // ---------------------------------------------------------------------------
 function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
 
+
+
+
+
 function computeScores(logs) {
-  const present = logs.filter(l => l.attendance !== 'Absent' && l.attendance !== 'Excused Absence'&& l.attendance !== 1&& l.attendance !== 2);
-  const total   = logs.length;
+  const present = logs.filter(l => l.attendance !== 'Absent' && l.attendance !== 'Excused Absence' && l.attendance !== 1 && l.attendance !== 2);
+
+  // Same-day cancel-out: an absent log doesn't count if there's a present log that day
+  const presentDays = new Set(present.map(l => l.date));
+  const isRealAbsence = l =>
+    (l.attendance === 'Absent' || l.attendance === 'Excused Absence' || l.attendance === 1 || l.attendance === 2)
+    && !presentDays.has(l.date);
+
+  const logsForAttendance = logs.filter(l => present.includes(l) || isRealAbsence(l));
+  const total = logsForAttendance.length;
+
   const memLogs = present.filter(l => l.type === 'memorization');
   const revLogs = present.filter(l => l.type === 'review');
   const attendance_score = total > 0
     ? clamp(Math.round((present.length / total) * 5), 1, 5) : 3;
-
   const behavior_score = present.length > 0
     ? clamp(Math.round(present.reduce((a, l) => a + l.behavior, 0) / present.length), 1, 5) : 5;
-
   const memorization_score = memLogs.length > 0
     ? clamp(Math.round((memLogs.filter(l => l.grade === 'pass').length / memLogs.length) * 5), 1, 5) : 3;
-
   const review_score = revLogs.length > 0
     ? clamp(Math.round((revLogs.filter(l => l.grade === 'pass').length / revLogs.length) * 5), 1, 5) : 3;
-
   const reading_score = clamp(Math.round((memorization_score + review_score) / 2), 1, 5);
-
   return { behavior_score, reading_score, review_score, memorization_score, attendance_score };
 }
 
+
 function computeStats(logs) {
   const present     = logs.filter(l => l.attendance !== 1 && l.attendance !== 2);
-  const absent_days = logs.filter(l => l.attendance === 1 || l.attendance === 2).length;
+
+  // 2nd change: an absent log doesn't count if there's a present log on the same day
+  const presentDays = new Set(present.map(l => l.date));
+  const absent_days = logs.filter(l =>
+    (l.attendance === 1 || l.attendance === 2) && !presentDays.has(l.date)
+  ).length;
 
   let total_ayahs_memorized = 0;
   let total_ayahs_reviewed  = 0;
@@ -164,10 +178,8 @@ function computeStats(logs) {
   for (const log of present) {
     if (log.ayahStart != null && log.ayahEnd != null && log.surahName) {
       const ayahs = log.ayahEnd - log.ayahStart + 1;
-
       if (log.type === 'memorization') total_ayahs_memorized += ayahs;
       else if (log.type === 'review')  total_ayahs_reviewed  += ayahs;
-
       if (!surahMap[log.surahName]) {
         surahMap[log.surahName] = { surahName: log.surahName, surah: log.surah ?? 0, ayahs: 0, sessions: 0 };
       }
@@ -176,18 +188,21 @@ function computeStats(logs) {
     }
   }
 
+  // 1st change: sessions = unique days, not log count
+  const total_sessions        = new Set(present.map(l => l.date)).size;
+  const memorization_sessions = new Set(present.filter(l => l.type === 'memorization').map(l => l.date)).size;
+  const review_sessions       = new Set(present.filter(l => l.type === 'review').map(l => l.date)).size;
 
   return {
     total_ayahs_memorized,
     total_ayahs_reviewed,
-    total_sessions:         present.length,
-    memorization_sessions:  present.filter(l => l.type === 'memorization').length,
-    review_sessions:        present.filter(l => l.type === 'review').length,
+    total_sessions,
+    memorization_sessions,
+    review_sessions,
     absent_days,
-    surah_breakdown:        Object.values(surahMap).sort((a, b) => a.surah - b.surah),
+    surah_breakdown: Object.values(surahMap).sort((a, b) => a.surah - b.surah),
   };
 }
-
 // ---------------------------------------------------------------------------
 // Shared sub-components
 // ---------------------------------------------------------------------------
@@ -322,7 +337,7 @@ function ReportCardModal({ report, onClose }) {
 // Trimester tab
 // ---------------------------------------------------------------------------
 function TrimesterTab({ studentId, logs, classroomId, apiBaseUrl }) {
-  const baseUrl = apiBaseUrl || DEFAULT_API_BASE_URL;
+  const baseUrl = apiBaseUrl;
   const today = new Date().toISOString().split('T')[0];
 
   const [trimester,  setTrimester]  = useState(1);

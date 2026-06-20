@@ -20,14 +20,13 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 
 import AuthScene from '../components/AuthScene';
 import TextField from '../components/TextField';
 import { validatePassword } from '../constants/validation';
 import { colors, spacing, radii, fonts, shadow } from '../constants/theme';
-import { useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
+import api from '../api.js'; 
 
 const REMEMBERED_USERNAME_KEY = 'rememberedUsername';
 
@@ -107,18 +106,13 @@ async function handleLogin() {
       );
     }
 
-    const response = await axios.post(
-      'https://lmsmasjid-backend.onrender.com/api/login/',
-      {
-        username,
-        password,
-      }
-    );
-    
-    const accessToken = response.data.access;
-    await AsyncStorage.setItem('authToken', accessToken)
+    // Goes through api.js so the baseURL/interceptors are consistent with
+    // every other request — this is the call that gets you both tokens.
+    const response = await api.post('/login/', { username, password });
+
+    await AsyncStorage.setItem('authToken', response.data.access);
+    await AsyncStorage.setItem('refreshToken', response.data.refresh);
     setAuthenticated(true);
-    
 
   } catch (error) {
     console.error(error);

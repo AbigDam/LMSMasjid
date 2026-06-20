@@ -15,7 +15,7 @@ import { AddLogForm }      from '../components/AddLogForm';
 import { ReportGenerator } from '../components/ReportGenerator';
 import { brand }           from '../constants/brand';
 import { colors, fonts, radii, shadow, spacing } from '../constants/theme';
-import axios from 'axios';
+import api from '../api.js'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ---------------------------------------------------------------------------
@@ -159,14 +159,7 @@ export default function AddLogScreen({ navigation, route }) {
       async function loadLogs() {
           try {
               const token = await AsyncStorage.getItem('authToken');
-              const response = await axios.get(
-                  `https://lmsmasjid-backend.onrender.com/api/get_logs/?class_id=${course.id}`,
-                  {
-                      headers: {
-                          Authorization: `Bearer ${token}`,
-                      },
-                  }
-              );
+              const response = await api.get(`/get_logs/?class_id=${course.id}`);
               setAllLogs(response.data);
           } catch (error) {
               console.error(error);
@@ -556,7 +549,7 @@ async function handleAddLog(newLog) {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.xl }}
             >
-              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id}/>
+              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl = "http://127.0.0.1:8000/"/>
             </ScrollView>
           </View>
         </View>

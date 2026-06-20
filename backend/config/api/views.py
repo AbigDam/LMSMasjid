@@ -250,6 +250,40 @@ class GetAttendanceView(APIView):
         )
         return Response(list(dates))
 
+
+class CreateClassAccounts(APIView):
+     def post(self, request): 
+        first_names = self.request.data.get("first_names") 
+        last_names = self.request.data.get("last_names") 
+        emails = self.request.data.get("emails") 
+        class_name = self.request.data.get("class_name") 
+        
+        prorgram = self.request.data.get("prorgram") 
+        schedule = self.request.data.get("schedule") 
+        room = self.request.data.get("room") 
+
+        teacher = Teacher.objects.get(corresponding_user = request.user)
+        
+        classroom = Class.objects.create(class_name = class_name, teacher = teacher, prorgram = prorgram, schedule = schedule, room = room, status = True) 
+        results = {"created": []}
+
+        student_role, _ = Role.objects.get_or_create(role_name="Student") 
+        for i in range(len(first_names)): 
+            first_name = first_names[i] 
+            last_name = last_names[i] 
+            email = emails[i] 
+            username = f"{first_name}{last_name}" 
+            password = "studentpass" 
+            role_obj = Role.objects.get(role_name = "Student")
+            if User.objects.get(username = first_name + last_name):
+                user = User.objects.get(username = first_name + last_name)
+            else:
+                user = User.objects.create_user(username = first_name + last_name, first_name = first_name, last_name = last_name, email = email, password = password, role = role_obj)
+            student, __ = Student.objects.get12_or_create(corresponding_user = user, classroom = classroom) 
+            results["created"].append( {"username":username, "student_id":student.student_id}) 
+        
+        return Response(results, status=status.HTTP_201_CREATED)
+        
 quran_surahs = {
     1: "Al-Fatiha",
     2: "Al-Baqara",

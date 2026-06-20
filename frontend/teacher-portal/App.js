@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import api, { setOnAuthFailure } from './api'; // adjust path if api.js lives elsewhere
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -15,6 +15,7 @@ import DashboardScreen from './screens/DashboardScreen';
 import LoadingScreen from './screens/LoadingScreen';
 import AddLogScreen from './screens/AddLogScreen';
 import StudentViewScreen from './screens/StudentViewScreen';
+import CreateClassAccountsScreen from './screens/CreateClassAccountsScreen.js';
 import { AuthContext } from './context/AuthContext';
 import { colors, spacing, fonts, radii } from './constants/theme';
 
@@ -62,7 +63,8 @@ function AppStack({ user, userError, onRetryUser }) {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="AddLog" component={AddLogScreen} />
-           <Stack.Screen name="StudentRoster" component={StudentViewScreen} />
+          <Stack.Screen name="StudentRoster" component={StudentViewScreen} />
+          <Stack.Screen name="CreateClassAccounts" component={CreateClassAccountsScreen} />
         </Stack.Navigator>
       );
     case 3: // Admin
@@ -84,11 +86,21 @@ function AppStack({ user, userError, onRetryUser }) {
 
 /* ---------------- ROOT APP ---------------- */
 export default function App() {
-  
+
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [userError, setUserError] = useState(null);
+
+  // Registered once: if api.js ever fails to refresh the access token
+  // (refresh token itself expired/invalid), this fires from ANY screen,
+  // not just this file, and kicks the user back to AuthStack.
+  useEffect(() => {
+    setOnAuthFailure(() => {
+      setAuthenticated(false);
+      setUser(null);
+    });
+  }, []);
 
   const checkAuth = useCallback(async () => {
     console.log('Checking authentication...');
@@ -101,26 +113,27 @@ export default function App() {
       const isAuthed = !!token;
       setAuthenticated(isAuthed);
 
-      
+
       if (isAuthed) {
         try {
-          const response = await axios.get(
-            'https://lmsmasjid-backend.onrender.com/api/current_user/',
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          // Goes through api.js now: auth header is attached automatically,
+          // and if the access token is expired this transparently refreshes
+          // and retries before ever reaching this catch block.
+          const response = await api.get('/current_user/');
           setUser(response.data);
         } catch (userErr) {
 
           console.error('Failed to fetch current user:', userErr?.response?.status, userErr?.response?.data);
 
           if (userErr?.response?.status === 401) {
-            
-            await AsyncStorage.removeItem('authToken');
+            // Refresh already happened inside api.js and still failed —
+            // this is a genuine logged-out state, not a transient expiry.
+            await AsyncStorage.multiRemove(['authToken', 'refreshToken']);
             setAuthenticated(false);
             setUser(null);
             setUserError(null);
           } else {
-            
+
             setUser(null);
             setUserError(
               userErr?.response?.data?.error ||
@@ -145,12 +158,12 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
-  
+
   }, [authenticated]);
 
   if (loading) return <LoadingScreen label="Fetching login…" />;
 
-  
+
   return (
     <AuthContext.Provider value={{ authenticated, setAuthenticated, user, setUser, loading }}>
       <SafeAreaProvider>

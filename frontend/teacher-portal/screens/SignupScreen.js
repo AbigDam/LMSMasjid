@@ -27,6 +27,7 @@ import PasswordStrength from '../components/PasswordStrength';
 import { isValidEmail, validatePassword } from '../constants/validation';
 import { colors, spacing, radii, fonts, shadow } from '../constants/theme';
 import axios from 'axios';
+import api from '../api.js'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 

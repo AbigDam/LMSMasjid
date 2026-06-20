@@ -38,7 +38,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Sidebar from '../components/Sidebar';
 import CourseCard from '../components/CourseCard';
 import { brand, brandImages } from '../constants/brand';
-import axios from 'axios';
+import api from '../api.js'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 
@@ -95,14 +95,7 @@ export default function DashboardScreen({ navigation }) {
       try {
         const token = await AsyncStorage.getItem('authToken');
 
-        const response = await axios.get(
-          'https://lmsmasjid-backend.onrender.com/api/select_classes/',
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        )
+        const response = await api.get('/select_classes/');
 
         setCourses(response.data);
         
@@ -119,14 +112,7 @@ useEffect(() => {
     try {
       const token = await AsyncStorage.getItem('authToken');
 
-      const response = await axios.get(
-        'https://lmsmasjid-backend.onrender.com/api/current_user/',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+      const response = await api.get('/current_user/');
 
       setTeacher(response.data);
     } catch (error) {
@@ -139,14 +125,7 @@ useEffect(() => {
 
 
 useEffect(() => {
-  axios.get("https://lmsmasjid-backend.onrender.com/api/announcements/", {
-  })
-  .then(res => {
-    setAnnouncements(res.data);
-  })
-  .catch(err => {
-    console.log(err);
-  });
+  api.get('/announcements/');
 }, []);
 
 
@@ -276,7 +255,13 @@ useEffect(() => {
                 <View style={styles.sectionTitleIndicator} />
                 <Text style={styles.hubSectionTitleText}>Your Teaching Courses</Text>
               </View>
-
+            <Pressable
+              style={styles.createClassButton}
+              onPress={() => navigation.navigate('CreateClassAccounts')}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.createClassButtonText}>Create Class</Text>
+            </Pressable>
               <View style={styles.largeCardGrid}>
                 {courses.map((course) => (
                   <View key={course.id} style={styles.courseCardContainerOverride}>
@@ -370,7 +355,18 @@ const styles = StyleSheet.create({
   logoutButton: { padding: 8, backgroundColor: 'rgb(221, 5, 5)', borderRadius: 8 },
 
   scrollCanvas: { padding: 32, maxWidth: 1600, width: '100%', alignSelf: 'center' },
-
+  createClassButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    backgroundColor: BRONZE_COLORS.bronzeBright,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  createClassButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   hubWelcomeBanner: {
     backgroundColor: BRONZE_COLORS.surfaceWhite,
     borderRadius: 14,
