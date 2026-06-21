@@ -70,7 +70,7 @@ function validate(trimmedFirstName, trimmedLastName, trimmedEmail) {
 
   return next;
 }
-const API_URL = 'https://lmsmasjid-backend.onrender.com/';
+const API_URL = 'https://lmsmasjid-backend.onrender.com';
 
 const { setAuthenticated } = useAuth();
 
