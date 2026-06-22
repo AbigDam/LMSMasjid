@@ -150,13 +150,13 @@ function computeScores(logs) {
   const memLogs = present.filter(l => l.type === 'memorization');
   const revLogs = present.filter(l => l.type === 'review');
   const attendance_score = total > 0
-    ? clamp(Math.round((present.length / total) * 5), 1, 5) : 3;
+    ? clamp(Math.round((present.length / total) * 5), 1, 5) : 1;
   const behavior_score = present.length > 0
-    ? clamp(Math.round(present.reduce((a, l) => a + l.behavior, 0) / present.length), 1, 5) : 5;
+    ? clamp(Math.round(present.reduce((a, l) => a + l.behavior, 0) / present.length), 1, 5) : 1;
   const memorization_score = memLogs.length > 0
-    ? clamp(Math.round((memLogs.filter(l => l.grade === 'pass').length / memLogs.length) * 5), 1, 5) : 3;
+    ? clamp(Math.round((memLogs.filter(l => l.grade === 'pass').length / memLogs.length) * 5), 1, 5) : 1;
   const review_score = revLogs.length > 0
-    ? clamp(Math.round((revLogs.filter(l => l.grade === 'pass').length / revLogs.length) * 5), 1, 5) : 3;
+    ? clamp(Math.round((revLogs.filter(l => l.grade === 'pass').length / revLogs.length) * 5), 1, 5) : 1;
   const reading_score = clamp(Math.round((memorization_score + review_score) / 2), 1, 5);
   return { behavior_score, reading_score, review_score, memorization_score, attendance_score };
 }
