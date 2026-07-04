@@ -32,22 +32,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 
 export default function SignupScreen({ navigation }) {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState({});
 
-function validate(trimmedFirstName, trimmedLastName, trimmedEmail) {
+function validate(trimmedUsername, trimmedEmail) {
   const next = {};
 
-  if (!trimmedFirstName) {
-    next.firstName = 'First name is required.';
-  }
-
-  if (!trimmedLastName) {
-    next.lastName = 'Last name is required.';
+  if (!trimmedUsername) {
+    next.username = 'Username is required.';
   }
 
   if (!trimmedEmail) {
@@ -75,13 +70,11 @@ const API_URL = 'https://lmsmasjid-backend.onrender.com';
 const { setAuthenticated } = useAuth();
 
 async function handleSignup() {
-  const trimmedFirstName = firstName.trim();
-  const trimmedLastName = lastName.trim();
+  const trimmedUsername = username.trim();
   const trimmedEmail = email.trim();
 
   const validationErrors = validate(
-    trimmedFirstName,
-    trimmedLastName,
+    trimmedUsername,
     trimmedEmail
   );
 
@@ -95,8 +88,7 @@ async function handleSignup() {
     const response = await axios.post(
       `${API_URL}/api/register/`,
       {
-        first_name: trimmedFirstName,
-        last_name: trimmedLastName,
+        username: trimmedUsername,
         email: trimmedEmail,
         password,
         role: 'Teacher',
@@ -131,24 +123,13 @@ async function handleSignup() {
       <Text style={styles.welcomeSub}>Join the Al-Hidaya teaching team</Text>
 
     <TextField
-      label="First Name"
+      label="Username"
       iconName="person-outline"
-      value={firstName}
-      onChangeText={setFirstName}
-      placeholder="Ahmad"
-      error={errors.firstName}
-      autoCapitalize="words"
-      returnKeyType="next"
-    />
-
-    <TextField
-      label="Last Name"
-      iconName="person-outline"
-      value={lastName}
-      onChangeText={setLastName}
-      placeholder="Khan"
-      error={errors.lastName}
-      autoCapitalize="words"
+      value={username}
+      onChangeText={setUsername}
+      placeholder="Username"
+      error={errors.username}
+      autoCapitalize="none"
       returnKeyType="next"
     />
 

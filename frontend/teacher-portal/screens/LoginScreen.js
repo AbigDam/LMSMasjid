@@ -32,8 +32,7 @@ const REMEMBERED_USERNAME_KEY = 'rememberedUsername';
 
 export default function LoginScreen({ navigation }) {
   const { setAuthenticated } = useAuth();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
@@ -47,13 +46,7 @@ useEffect(() => {
       );
 
       if (saved) {
-        const split = saved.split('_');
-
-        if (split.length >= 2) {
-          setFirstName(split[0]);
-          setLastName(split.slice(1).join('_'));
-        }
-
+        setUsername(saved);
         setRememberMe(true);
       }
     } catch (e) {
@@ -64,12 +57,8 @@ useEffect(() => {
 function validate() {
   const next = {};
 
-  if (!firstName.trim()) {
-    next.firstName = 'First name is required.';
-  }
-
-  if (!lastName.trim()) {
-    next.lastName = 'Last name is required.';
+  if (!username.trim()) {
+    next.username = 'Username is required.';
   }
 
   const pwError = validatePassword(password);
@@ -90,15 +79,13 @@ async function handleLogin() {
     return;
   }
 
-  const username =
-    `${firstName.trim()}${lastName.trim()}`
-      .replace(/\s+/g, '');
+  const trimmedUsername = username.trim();
 
   try {
     if (rememberMe) {
       await AsyncStorage.setItem(
         REMEMBERED_USERNAME_KEY,
-        `${firstName.trim()}_${lastName.trim()}`
+        trimmedUsername
       );
     } else {
       await AsyncStorage.removeItem(
@@ -108,10 +95,12 @@ async function handleLogin() {
 
     // Goes through api.js so the baseURL/interceptors are consistent with
     // every other request — this is the call that gets you both tokens.
-    const response = await api.post('/login/', { username, password });
+    const response = await api.post('/login/', { username: trimmedUsername, password });
 
     await AsyncStorage.setItem('authToken', response.data.access);
     await AsyncStorage.setItem('refreshToken', response.data.refresh);
+    // Controls whether the session survives an app restart — see App.js checkAuth().
+    await AsyncStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
     setAuthenticated(true);
 
   } catch (error) {
@@ -137,24 +126,14 @@ async function handleLogin() {
       {/* <Text style={styles.welcomeSub}>Sign in to manage your classes</Text> */}
 
       <TextField
-        label="First Name"
+        label="Username"
         iconName="person-outline"
-        value={firstName}
-        onChangeText={setFirstName}
-        placeholder="First Name"
-        error={errors.firstName}
-        autoCapitalize="words"
+        value={username}
+        onChangeText={setUsername}
+        placeholder="Username"
+        error={errors.username}
+        autoCapitalize="none"
       />
-
-      <TextField
-        label="Last Name"
-        iconName="person-outline"
-        value={lastName}
-        onChangeText={setLastName}
-        placeholder="Last Name"
-        error={errors.lastName}
-        autoCapitalize="words"
-/>
 
       <TextField
         label="Password"

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setOnAuthFailure } from './api'; // adjust path if api.js lives elsewhere
 
@@ -102,12 +102,28 @@ export default function App() {
     });
   }, []);
 
+  // Only the very first checkAuth() call (app cold start) should honor the
+  // "Remember me" flag. Later calls happen because *this session* just
+  // logged in/out, so they must not be gated by a stale flag value.
+  const hasCheckedRememberOnBoot = useRef(false);
+
   const checkAuth = useCallback(async () => {
     console.log('Checking authentication...');
     setLoading(true);
     setUserError(null);
 
     try {
+      if (!hasCheckedRememberOnBoot.current) {
+        hasCheckedRememberOnBoot.current = true;
+
+        const remembered = await AsyncStorage.getItem('rememberMe');
+        if (remembered !== 'true') {
+          // Not remembered — don't resurrect a session left over from a
+          // previous run; require a fresh login.
+          await AsyncStorage.multiRemove(['authToken', 'refreshToken']);
+        }
+      }
+
       const token = await AsyncStorage.getItem('authToken');
       console.log('TOKEN FROM STORAGE:', token);
       const isAuthed = !!token;
