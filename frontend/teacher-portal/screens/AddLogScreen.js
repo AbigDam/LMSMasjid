@@ -148,6 +148,8 @@ export default function AddLogScreen({ navigation, route }) {
   const todayLog        = getTodayLog(studentLogs);
   const editingLog      = editingLogId ? studentLogs.find(l => l.id === editingLogId) ?? null : null;
 
+  const isTodayAbsent = todayLog && (todayLog.attendance === 1 || todayLog.attendance === 2 || todayLog.attendance === 'Absent' || todayLog.attendance === 'Excused Absence');
+
   // Show the form when: no log today, OR teacher clicked Edit on a history row, OR teacher clicked "Add Log".
   const showForm = !todayLog || !!editingLogId || addingLog;
 
@@ -216,7 +218,11 @@ async function handleAddLog(newLog) {
   setIsEditing(false);
   setViewingHistory(false);
   setAddingLog(false);
+
 }
+
+
+
 
   // Edit Log handler — now takes the specific logId being edited (from the history row),
   // rather than assuming it's always today's log.
@@ -349,8 +355,12 @@ async function handleAddLog(newLog) {
 
                 {/* Add Log Button Trigger — always available, opens a fresh blank form */}
                 <TouchableOpacity
-                  style={styles.inlineRowBtn}
+                  style={
+                    [styles.inlineRowBtn,
+                    isTodayAbsent && { backgroundColor: colors.border }]
+                  }
                   onPress={() => setAddingLog(true)}
+                  disabled={isTodayAbsent}
                 >
                   <MaterialCommunityIcons
                     name="plus"
@@ -390,6 +400,7 @@ async function handleAddLog(newLog) {
           {showForm ? (
             <AddLogForm
               onSubmit={editingLogId ? (fields) => handleUpdateLog(editingLogId, fields) : handleAddLog}
+              skipAttendanceStep={!!todayLog && addingLog}
               initialData={editingLog ? {
                 attendance:  editingLog.attendance || 'Present',
                 surah:       editingLog.surah,

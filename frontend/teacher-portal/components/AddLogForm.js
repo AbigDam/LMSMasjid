@@ -130,8 +130,8 @@ function OutlineButton({ label, onPress }) {
 // ---------------------------------------------------------------------------
 // AddLogForm
 // ---------------------------------------------------------------------------
-export function AddLogForm({ onSubmit, initialData }) {
-  const [currentStep, setCurrentStep] = useState(1);
+export function AddLogForm({ onSubmit, initialData, skipAttendanceStep = false }) {
+  const [currentStep, setCurrentStep] = useState(skipAttendanceStep ? 2 : 1);
   const [attendance, setAttendance]   = useState(initialData?.attendance ?? 'Present');
 
   const initialSurahObj = initialData?.surah
@@ -168,7 +168,7 @@ export function AddLogForm({ onSubmit, initialData }) {
   }
 
   function handleBack() {
-    if (currentStep === 2) setCurrentStep(1);
+    if (currentStep === 2 && !skipAttendanceStep) setCurrentStep(1);
     if (currentStep === 3) setCurrentStep(2);
   }
 
@@ -229,7 +229,11 @@ export function AddLogForm({ onSubmit, initialData }) {
           />
           <PrimaryButton
             label={isAbsent ? (initialData ? 'Save Changes' : 'Submit Log') : 'Next →'}
-            onPress={handleNext}
+            onPress={() => {
+              handleNext();
+              if (isAbsent) 
+                alert("Log has been submitted successfully!");
+            }}
           />
         </View>
       )}
@@ -313,7 +317,7 @@ export function AddLogForm({ onSubmit, initialData }) {
           </View>
 
           <View style={[s.row, { marginTop: spacing.xl }]}>
-            <OutlineButton label="← Back" onPress={handleBack} />
+            {!skipAttendanceStep && <OutlineButton label="← Back" onPress={handleBack} />}
             <View style={{ flex: 2 }}>
               <PrimaryButton label="Next →" onPress={handleNext} disabled={!canStep2} />
             </View>
@@ -340,7 +344,10 @@ export function AddLogForm({ onSubmit, initialData }) {
             <View style={{ flex: 2 }}>
               <PrimaryButton
                 label={initialData ? 'Save Changes' : 'Submit Log'}
-                onPress={handleSubmit}
+                onPress={() => {
+                  handleSubmit();
+                  alert("Log has been submitted successfully!");
+                }}
               />
             </View>
           </View>
