@@ -162,7 +162,7 @@ useEffect(() => {
   const nextClass = courses[0];
 
   async function handleSignOut() {
-    await AsyncStorage.removeItem('authToken');
+    await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'rememberMe']);
     setAuthenticated(false);
   }
 
@@ -209,7 +209,7 @@ useEffect(() => {
         <View style={styles.headerRight}>
           <View style={styles.teacherBadgeContainer}>
             <View style={styles.onlineDot} />
-            <Text style={styles.teacherBadgeText}>{teacher?.first_name} {teacher?.last_name}</Text>
+            <Text style={styles.teacherBadgeText}>{teacher?.username}</Text>
           </View>
           <Pressable onPress={handleSignOut} style={styles.logoutButton}>
             <Ionicons name="log-out-outline" size={26} color="#FFFFFF" />
@@ -236,7 +236,7 @@ useEffect(() => {
           
           {/* Welcome Banner Box */}
           <View style={styles.hubWelcomeBanner}>
-            <Text style={styles.hubGreeting}>Teacher {teacher?.first_name}</Text>
+            <Text style={styles.hubGreeting}>Teacher {teacher?.username}</Text>
             <Text style={styles.hubSubGreeting}>Al-Hidaya Teacher Portal Dashboard — Manage your active classes and student logs.</Text>
           </View>
 

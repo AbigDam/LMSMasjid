@@ -8,8 +8,7 @@ from datetime import timedelta
 User = get_user_model()
 
 class RegisterSerializer(serializers.Serializer):
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
+    username = serializers.CharField()
     email = serializers.EmailField()
     password = serializers.CharField(write_only = True)
     role = serializers.CharField()
@@ -18,9 +17,7 @@ class RegisterSerializer(serializers.Serializer):
         role_name = validated_data.pop("role")
         role_obj, created= Role.objects.get_or_create(role_name = role_name)
 
-        user = User.objects.create_user(username = validated_data["first_name"] + validated_data["last_name"],
-                            first_name = validated_data["first_name"],
-                            last_name = validated_data["last_name"],
+        user = User.objects.create_user(username = validated_data["username"],
                             email = validated_data["email"],
                             password = validated_data["password"],
                             role = role_obj)
