@@ -15,20 +15,17 @@ class RegisterSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         role_name = validated_data.pop("role")
-        role_obj, created= Role.objects.get_or_create(role_name = role_name)
+        if role_name == "Teacher":
+            role_obj = 0
+        elif role_name == "Parent":
+            role_obj = 1
+        elif role_name == "Student":
+            role_obj = 2
 
         user = User.objects.create_user(username = validated_data["username"],
                             email = validated_data["email"],
                             password = validated_data["password"],
                             role = role_obj)
-        if role_obj.role_name == "Teacher":
-            Teacher.objects.create(corresponding_user = user)
-        
-        if role_obj.role_name == "Student":
-            Student.objects.create(corresponding_user = user)
-
-        if role_obj.role_name == "Parent":
-            Parent.objects.create(corresponding_user = user)
 
         return user
     
@@ -38,17 +35,17 @@ class CreateClassSerializer(serializers.Serializer):
     def create(self, validated_data):
         user = self.context["request"].user
         
-        classroom = Class.objects.create(teacher = Teacher.objects.get(corresponding_user = user),class_name = validated_data["class_name"])
+        classroom = Class.objects.create(teacher =  [user],class_name = validated_data["class_name"])
 
         return classroom
 
 class ClassSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="class_id", read_only=True)
     title = serializers.CharField(source="class_name", read_only=True)
-    program = serializers.CharField(source="prorgram", read_only=True)
 
-    students = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    students = serializers.SerializerMethodField()
+
 
     class Meta:
         model = Class
@@ -56,6 +53,7 @@ class ClassSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "program",
+            "teachers",
             "students",
             "schedule",
             "room",
@@ -63,11 +61,10 @@ class ClassSerializer(serializers.ModelSerializer):
         ]
 
     def get_students(self, obj):
-        return obj.students.count()
+        return len(obj.students or [])
 
     def get_status(self, obj):
         return "active" if obj.status else "inactive"
-
 
 class AnnouncementSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="announcement_id", read_only=True)
@@ -112,8 +109,8 @@ class LogAttendanceSerializer(serializers.Serializer):
         }
 
     def create(self, validated_data):
-        teacher = Teacher.objects.get(corresponding_user=self.context["request"].user)
-        student = Student.objects.get(student_id=validated_data["student_id"])
+        teacher = self.context["request"].user
+        student = User.objects.get(id=validated_data["student_id"])
         classroom = Class.objects.get(class_id=validated_data["classroom_id"])
         present = validated_data["attendance"] == "Present"
         log_date = validated_data["date"]
@@ -163,8 +160,8 @@ class LogBehaviorSerializer(serializers.Serializer):
     date       = serializers.DateField(default=datetime.date.today)
 
     def create(self, validated_data):
-        teacher = Teacher.objects.get(corresponding_user=self.context["request"].user)
-        student = Student.objects.get(student_id=validated_data["student_id"])
+        teacher = self.context["request"].user
+        student = User.objects.get(id=validated_data["student_id"])
 
         behavior_log = Behavior_Log.objects.create(
             student=student,
@@ -195,7 +192,7 @@ class CreateLogSerializer(serializers.Serializer):
     log_type = serializers.IntegerField(required=False) # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
 
     def create(self, validated_data):
-        student = Student.objects.get(student_id=validated_data["student_id"])
+        student = User.objects.get(id=validated_data["student_id"])
         classroom = Class.objects.get(class_id=validated_data["class_id"])
 
         log = Log.objects.create(
@@ -215,15 +212,11 @@ class CreateLogSerializer(serializers.Serializer):
         
 # ── Student ──────────────────────────────────────────────────────────────────
 class StudentSerializer(serializers.ModelSerializer):
-    # Check work???????
-    id = serializers.IntegerField(source="student_id", read_only=True)
-    first_name = serializers.CharField(source="corresponding_user.first_name", read_only=True)
-    last_name = serializers.CharField(source="corresponding_user.last_name", read_only=True)
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
-        model = Student
+        model = User
         fields = ["id", "first_name", "last_name"]
-
 
 ## Report Card ##
 SCORE_FIELDS = (

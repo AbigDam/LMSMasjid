@@ -65,8 +65,8 @@ function validate(trimmedUsername, trimmedEmail) {
 
   return next;
 }
-const API_URL = 'https://lmsmasjid-backend.onrender.com';
-
+const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+console.log('API_URL:', API_URL); // Log the API URL to verify it's being read correctly
 const { setAuthenticated } = useAuth();
 
 async function handleSignup() {
@@ -85,8 +85,9 @@ async function handleSignup() {
   }
 
   try {
+    console.log('Registering to :', `${API_URL}/register/`); // Log the API URL to verify it's being read correctly
     const response = await axios.post(
-      `${API_URL}/api/register/`,
+      `${API_URL}/register/`,
       {
         username: trimmedUsername,
         email: trimmedEmail,
@@ -99,7 +100,6 @@ async function handleSignup() {
 
     await AsyncStorage.setItem('authToken', accessToken);
 
-    // 🔥 THIS replaces navigation
     setAuthenticated(true);
 
   } catch (error) {

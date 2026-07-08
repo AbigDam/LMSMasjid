@@ -36,8 +36,12 @@ class FilterClasses(APIView):
     def get(self, request):
         permission_classes = [IsAuthenticated]
 
-        teacher_name = request.user.username
-        classes = Class.objects.filter(teacher = Teacher.objects.get(corresponding_user = User.objects.get(username = teacher_name)))
+        teacher_id = request.user.id
+        all_classes = Class.objects.all()
+        classes = []
+        for classroom in all_classes:
+            if teacher_id in classroom.teachers:
+                classes.append(classroom)
         serializer  = ClassSerializer(classes, many=True)
         return Response(serializer.data)
 
@@ -50,29 +54,28 @@ class CurrentUser(APIView):
             "last_name": request.user.last_name,
             "email": request.user.email,
             "username": request.user.username,
-            "role_id": request.user.role_id,
+            "role_id": request.user.role,
         })
 
 class AnnouncementListView(ListAPIView):
     queryset = Announcement.objects.all().order_by("-date")
     serializer_class = AnnouncementSerializer
 
-### Yousef TODO: Add the following API endpoints:
-# Create Account Student 
-# Add Student to Classroom
-# Remove Student from Classroom
 
-# Return all Students in Class
 class StudentListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, class_id):
-        students = Student.objects.filter(classroom__class_id=class_id)
+        classroom = get_object_or_404(Class, class_id=class_id)
+        student_ids = classroom.students or []
+
+        students = User.objects.filter(
+            id__in=student_ids, 
+            role=2
+        )
+
         serializer = StudentSerializer(students, many=True)
-    
         return Response(serializer.data)
-
-
 class CreateLogView(generics.CreateAPIView):
     serializer_class = CreateLogSerializer
 
@@ -258,30 +261,31 @@ class CreateClassAccounts(APIView):
         emails = self.request.data.get("emails") 
         class_name = self.request.data.get("class_name") 
         
-        prorgram = self.request.data.get("prorgram") 
+        program = self.request.data.get("program") 
         schedule = self.request.data.get("schedule") 
         room = self.request.data.get("room") 
 
-        teacher = Teacher.objects.get(corresponding_user = request.user)
+        teacher =  request.user
         
-        classroom = Class.objects.create(class_name = class_name, teacher = teacher, prorgram = prorgram, schedule = schedule, room = room, status = True) 
+        classroom = Class.objects.create(class_name = class_name, teachers = [teacher.id], program = program, schedule = schedule, room = room, status = True) 
         results = {"created": []}
-
-        student_role, _ = Role.objects.get_or_create(role_name="Student") 
+        students = []
         for i in range(len(first_names)): 
             first_name = first_names[i] 
             last_name = last_names[i] 
             email = emails[i] 
             username = f"{first_name}{last_name}" 
             password = "studentpass" 
-            role_obj = Role.objects.get(role_name = "Student")
-            if User.objects.get(username = first_name + last_name):
+            role_obj = 2
+            if User.objects.filter(username = first_name + last_name).exists():
                 user = User.objects.get(username = first_name + last_name)
             else:
                 user = User.objects.create_user(username = first_name + last_name, first_name = first_name, last_name = last_name, email = email, password = password, role = role_obj)
-            student, __ = Student.objects.get12_or_create(corresponding_user = user, classroom = classroom) 
-            results["created"].append( {"username":username, "student_id":student.student_id}) 
-        
+            students.append(user.id)
+            results["created"].append( {"username":username, "student_id":user.id}) 
+        classroom.students = students
+        classroom.save()
+
         return Response(results, status=status.HTTP_201_CREATED)
         
 quran_surahs = {

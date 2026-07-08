@@ -1,8 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://lmsmasjid-backend.onrender.com/api/';
+//const BASE_URL = 'https://lmsmasjid-backend.onrender.com/api/';
+//const BASE_URL = 'http://127.0.0.1:8000/api/';
 
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const api = axios.create({ baseURL: BASE_URL });
 
 // AuthContext registers this so api.js can trigger a logout without
