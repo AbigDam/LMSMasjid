@@ -24,6 +24,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "predeploy": "npx expo export --platform web --clear",
     "deploy": "gh-pages -d dist",
     "android": "expo start --android",
     "ios": "expo start --ios",
