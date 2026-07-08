@@ -17,6 +17,9 @@
     },
     "web": {
       "favicon": "./assets/branding/icon.png"
+    },
+    "experiments": {
+      "baseUrl": "/LMSMasjid"
     }
   }
 }
