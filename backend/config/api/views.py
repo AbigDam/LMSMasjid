@@ -76,6 +76,7 @@ class StudentListView(APIView):
 
         serializer = StudentSerializer(students, many=True)
         return Response(serializer.data)
+        
 class CreateLogView(generics.CreateAPIView):
     serializer_class = CreateLogSerializer
 

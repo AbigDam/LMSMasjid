@@ -99,7 +99,7 @@ function firstErrorMessage(data, fallback) {
 }
 
 async function fetchReportCards(baseUrl, studentId) {
-  const res = await fetch(`${baseUrl}/api/report-card/?student=${studentId}`, {
+  const res = await fetch(`${baseUrl}/report-card/?student=${studentId}`, {
     // TODO: attach an Authorization header here if your API requires one
   });
   const { ok, status, data } = await parseJsonResponse(res);
@@ -110,7 +110,7 @@ async function fetchReportCards(baseUrl, studentId) {
 }
 
 async function createReportCard(baseUrl, payload) {
-  const res = await fetch(`${baseUrl}/api/report-card/`, {
+  const res = await fetch(`${baseUrl}/report-card/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
