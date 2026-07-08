@@ -24,12 +24,13 @@
   },
   "scripts": {
     "start": "expo start",
-    "predeploy": "npx expo export --platform web --clear",
+    "predeploy": "npx expo export --platform web --clear && node -e \"const fs = require('fs'); let html = fs.readFileSync('dist/index.html', 'utf8'); html = html.replaceAll('/_expo/', './_expo/').replaceAll('/favicon.ico', './favicon.ico'); fs.writeFileSync('dist/index.html', html);\"",
     "deploy": "gh-pages -d dist",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
+
   "private": true,
   "devDependencies": {
     "@types/react": "~19.1.10",
