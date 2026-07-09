@@ -28,6 +28,7 @@ import { colors, spacing, radii, fonts, shadow } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import api from '../api.js'; 
 
+
 const REMEMBERED_USERNAME_KEY = 'rememberedUsername';
 
 export default function LoginScreen({ navigation }) {
@@ -80,7 +81,7 @@ async function handleLogin() {
   }
 
   const trimmedUsername = username.trim();
-
+  
   try {
     if (rememberMe) {
       await AsyncStorage.setItem(

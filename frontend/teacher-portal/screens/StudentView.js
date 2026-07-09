@@ -15,23 +15,49 @@ import { AddLogForm }      from '../components/AddLogForm';
 import { ReportGenerator } from '../components/ReportGenerator';
 import { brand }           from '../constants/brand';
 import { colors, fonts, radii, shadow, spacing } from '../constants/theme';
+import { quranSurahs }     from '../data/quran'; // CHANGED: backend only sends numeric `surah`, so we resolve names locally.
 import api from '../api.js'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_URL = process.env.EXPO_PUBLIC_BASE_URL;
 // ---------------------------------------------------------------------------
 // Mock data
 // ---------------------------------------------------------------------------
 const TODAY = new Date().toISOString().split('T')[0];
 
 // ---------------------------------------------------------------------------
-// Helpers
+// CHANGED: Helpers rebuilt for the new backend log/range model.
+//
+// A student can now have MULTIPLE Log rows on the same date, and each
+// "present" Log carries a `ranges` array (each range = one surah/ayah span
+// with its own `log_type` + `passed` flag). An "absent" Log (attendance !=
+// 0) has NO `ranges` key at all — instead it only carries `attendance`
+// (1 = Absent, 2 = Excused Absence). We use the presence of `ranges` vs
+// `attendance` as the source of truth for which kind of log we're looking
+// at, since that's exactly how GetLogsView shapes each entry.
 // ---------------------------------------------------------------------------
-function hasLogToday(logs) {
-  return logs.some(l => l.date === TODAY);
+const LOG_TYPE_LABELS = { memorization: 'Memorization', review: 'Review' };
+
+function isPresentLog(log) {
+  return !!log && Array.isArray(log.ranges);
+}
+function isAbsentLog(log) {
+  return !!log && log.attendance !== undefined && log.attendance !== null && log.attendance !== 0;
+}
+function getLogsForDate(logs, date) {
+  return logs.filter(l => l.date === date);
+}
+function surahName(number) {
+  return quranSurahs.find(s => s.number === number)?.name ?? `Surah ${number}`;
 }
 
-function getTodayLog(logs) {
-  return logs.find(l => l.date === TODAY) ?? null;
+// Flattens every range across a set of logs into one list, tagging each
+// range with the id/date of the Log it came from. We need `logId` because
+// there's no separate id per-range from the API — edit/delete still act on
+// the whole Log, so every range rendered from that Log points back to it.
+function flattenRanges(logs) {
+  return logs.flatMap(log =>
+    (log.ranges ?? []).map(range => ({ ...range, logId: log.id, date: log.date }))
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -43,74 +69,76 @@ const ATTENDANCE_LABELS = {
   1: 'Absent',
   2: 'Excused Absence',
 };
-function LogDetailView({ log, onEdit, viewHistory }) {
-  const isAbsent = log.attendance === 1 || log.attendance === 2 || log.attendance === 'Absent' || log.attendance === 'Excused Absence';
+
+// ---------------------------------------------------------------------------
+// CHANGED: New dashboard panel replacing LogDetailView/DetailRow.
+//
+// Renders a set of already-flattened ranges (see `flattenRanges`), grouped
+// by session type (Memorization / Review) — matching the "Review" /
+// "Memorization" grouped-card look from the reference screenshot. Each range
+// row shows the surah + Pass/Fail badge + edit/delete, same as the photo.
+//
+// `highlighted` gives the section the bronze/cream "brand" treatment (used
+// for "Today's Ranges"); without it, the section uses a plain surface
+// (used for "Recent Ranges") so the two are visually distinct at a glance.
+// Edit/Delete still operate on the whole Log a range came from — there's no
+// separate per-range id from the API — so pressing either on any range
+// inside the same Log has the same effect on that Log.
+// ---------------------------------------------------------------------------
+function RangeGroupSection({ title, ranges, highlighted = false, onEditRange, onDeleteRange }) {
+  // Group ranges by log_type, preserving the order each type first appears in.
+  const groups = [];
+  const groupsByType = {};
+  ranges.forEach(range => {
+    const key = range.log_type ?? 'unknown';
+    if (!groupsByType[key]) {
+      groupsByType[key] = { log_type: key, items: [] };
+      groups.push(groupsByType[key]);
+    }
+    groupsByType[key].items.push(range);
+  });
+
   return (
-    <View>
-      <View style={styles.loggedBanner}>
-        <MaterialCommunityIcons name="check-circle-outline" size={16} color={colors.success} />
-        <Text style={styles.loggedBannerText}>Log recorded for today</Text>
-      </View>
-
-      <View style={styles.detailCard}>
-        {isAbsent ?
-        (<DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] ?? log.attendance} bold />) 
-            : 
-          (
-            <>
-            <DetailRow label="Attendance" value={ATTENDANCE_LABELS[log.attendance] ?? log.attendance} />
-            <DetailRow
-              label="Surah & Ayahs"
-              value={`${log.surahName} · Ayahs ${log.ayahStart}–${log.ayahEnd}`}
-            />
-            <DetailRow
-              label="Session Type"
-              value={log.type.charAt(0).toUpperCase() + log.type.slice(1)}
-            />
-            <DetailRow
-              label="Grade"
-              value={log.grade?.toUpperCase() ?? 'N/A'}
-              bold
-              valueColor={log.grade === 'pass' ? colors.success : colors.danger}
-            />
-            <DetailRow label="Behavior" value={`${log.behavior} / 5`} />
-            {log.assignments ? (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Assignments & Comments</Text>
-                <View style={styles.assignmentBox}>
-                  <Text style={styles.assignmentText}>{log.assignments}</Text>
-                </View>
-              </View>
-            ) : null}
-          </>
-        )}
-      </View>
-
-      {/* Edit Log button removed per request — handler kept below, commented out.
-      <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-        <Ionicons name="pencil-outline" size={15} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
-        <Text style={styles.editBtnText}>Edit Log</Text>
-      </TouchableOpacity>
-      */}
-      <TouchableOpacity style={styles.viewHistoryBtn} onPress={viewHistory}>
-        <Ionicons name="time-outline" size={17} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
-        <Text style={styles.viewHistoryBtnText}>View/Edit Log History</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function DetailRow({ label, value, bold = false, valueColor }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={[
-        styles.detailValue,
-        bold && { fontWeight: '700' },
-        valueColor && { color: valueColor },
-      ]}>
-        {value}
+    <View style={[styles.rangesSection, highlighted && styles.rangesSectionHighlighted]}>
+      <Text style={[styles.rangesSectionTitle, highlighted && styles.rangesSectionTitleHighlighted]}>
+        {title}
       </Text>
+      {groups.map(group => (
+        <View key={group.log_type} style={styles.rangeTypeGroup}>
+          <Text style={styles.rangeTypeLabel}>
+            {LOG_TYPE_LABELS[group.log_type] ?? group.log_type}
+          </Text>
+          {group.items.map((range, idx) => (
+            <View
+              key={`${range.logId}-${idx}`}
+              style={[styles.rangeItemRow, idx === group.items.length - 1 && { borderBottomWidth: 0 }]}
+            >
+              <Text style={styles.rangeItemText} numberOfLines={1}>
+                {surahName(range.surah)}
+              </Text>
+              <View style={styles.rangeItemActions}>
+                <View style={[
+                  styles.rangeBadge,
+                  { backgroundColor: range.passed ? colors.successBg : colors.dangerBg },
+                ]}>
+                  <Text style={[
+                    styles.rangeBadgeText,
+                    { color: range.passed ? colors.success : colors.danger },
+                  ]}>
+                    {range.passed ? 'PASS' : 'FAIL'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => onEditRange(range.logId)} hitSlop={8} style={styles.rangeItemIconBtn}>
+                  <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onDeleteRange(range.logId)} hitSlop={8} style={styles.rangeItemIconBtn}>
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -145,13 +173,35 @@ export default function AddLogScreen({ navigation, route }) {
   const [editingLogId, setEditingLogId] = useState(null); // id of the historical log currently being edited, or null
 
   const studentLogs     = allLogs[selectedId] ?? [];
-  const todayLog        = getTodayLog(studentLogs);
-  const editingLog      = editingLogId ? studentLogs.find(l => l.id === editingLogId) ?? null : null;
 
-  const isTodayAbsent = todayLog && (todayLog.attendance === 1 || todayLog.attendance === 2 || todayLog.attendance === 'Absent' || todayLog.attendance === 'Excused Absence');
+  // CHANGED: a day can now hold MULTIPLE Log rows, so we work with an array
+  // of today's logs rather than a single one.
+  const todayLogs        = getLogsForDate(studentLogs, TODAY);
+  const todayPresentLogs = todayLogs.filter(isPresentLog);
+  const editingLog        = editingLogId ? studentLogs.find(l => l.id === editingLogId) ?? null : null;
 
-  // Show the form when: no log today, OR teacher clicked Edit on a history row, OR teacher clicked "Add Log".
-  const showForm = !todayLog || !!editingLogId || addingLog;
+  // CHANGED: "attended today" now means at least one present-type log exists
+  // for today (i.e. it has a `ranges` array). This replaces the old
+  // isTodayAbsent flag with its inverse, since presence, not absence, is the
+  // dashboard's default state now.
+  const isAttendedToday = todayPresentLogs.length > 0;
+
+  // Show the full form when: not attended yet today (nothing logged, or a
+  // rest/absence day), OR the teacher clicked Edit on a history row, OR the
+  // teacher tapped "Add Log" to record another session for today.
+  const showForm = !isAttendedToday || !!editingLogId || addingLog;
+
+  // Ranges logged today, for the highlighted "Today's Ranges" panel — hidden
+  // entirely by the caller when this is empty (nothing read today yet).
+  const todaysRanges = flattenRanges(todayPresentLogs);
+
+  // CHANGED: "Recent Ranges" = the 4 most recent individual ranges from
+  // PRIOR days (today excluded), most-recent-day-first.
+  const recentRanges = flattenRanges(
+    studentLogs
+      .filter(l => l.date !== TODAY && isPresentLog(l))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+  ).slice(0, 4);
 
   //Load Students
 
@@ -176,30 +226,25 @@ export default function AddLogScreen({ navigation, route }) {
     setViewingHistory(false);
     setAddingLog(false);
     setEditingLogId(null);
-    setReportExpanded(false);
+    // NOTE: removed a call to `setReportExpanded(false)` here — that setter/state
+    // was never actually declared anywhere in this file, so it would have
+    // thrown a ReferenceError the first time a student was selected.
   }
 
 async function handleAddLog(newLog) {
-  const logTypeMap = {
-    'memorization': 1,
-    'review': 2,
-    'reading': 0,
-  };
   const payload = {
     student_id: selectedId,
     class_id: course.id,
-    surah: newLog.surah,
-    starting_ayah: newLog.ayahStart,
-    ending_ayah: newLog.ayahEnd,
-    passed: newLog.grade === 'pass',
-    comments: newLog.comments ?? '',
+    // CHANGED: AddLogForm submits its notes field as `assignments`, not
+    // `comments` — this was silently sending an empty string before.
+    comments: newLog.assignments ?? '',
     behavior: newLog.behavior,
     date: TODAY,
     attendance: newLog.attendance === 'Absent' ? 1 : (newLog.attendance === 'Excused Absence' ? 2 : 0),
-    log_type: logTypeMap[newLog.type],
+    ranges: newLog.ranges,
   };
-
-  const response = await fetch(`${apiBaseUrl}/create_log/`, {
+  
+  const response = await fetch(`${API_URL}/create_log/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -210,7 +255,13 @@ async function handleAddLog(newLog) {
     return;
   }
   const { id } = await response.json();
-  const entry = { id, date: TODAY, ...newLog };
+
+  // CHANGED: match GetLogsView's own shape exactly instead of spreading the
+  // raw form fields (which no longer match the new model at all).
+  const entry = payload.attendance !== 0
+    ? { id, date: TODAY, attendance: payload.attendance }
+    : { id, date: TODAY, behavior: newLog.behavior, comments: payload.comments, ranges: newLog.ranges ?? [] };
+
   setAllLogs(prev => ({
     ...prev,
     [selectedId]: [entry, ...(prev[selectedId] ?? [])],
@@ -221,11 +272,16 @@ async function handleAddLog(newLog) {
 
 }
 
-
-
-
   // Edit Log handler — now takes the specific logId being edited (from the history row),
   // rather than assuming it's always today's log.
+  //
+  // NOT CHANGED / KNOWN ISSUE: this still builds a single-surah/single-grade
+  // payload (`surah`, `starting_ayah`, `passed`, `log_type`...), which no
+  // longer matches the multi-range model used everywhere else in this file.
+  // I didn't touch it because the `update_log` endpoint's new multi-range
+  // contract wasn't part of what was shared — this needs its own pass (most
+  // likely accepting a `ranges` array like `create_log` does) once that's
+  // defined, otherwise editing a historical log will send the wrong shape.
   async function handleUpdateLog(logId, updatedFields) {
     const logTypeMap = {
       'memorization': 1,
@@ -248,7 +304,8 @@ async function handleAddLog(newLog) {
     };
 
     const token = await AsyncStorage.getItem('authToken');
-    const response = await fetch(`${apiBaseUrl}/update_log/`, {
+
+    const response = await fetch(`${API_URL}/api/update_log/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -275,7 +332,8 @@ async function handleAddLog(newLog) {
   async function handleDeleteLog(logId) {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch(`${apiBaseUrl}/delete_log/`, {
+
+      const response = await fetch(`${API_URL}/api/delete_log/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -350,77 +408,108 @@ async function handleAddLog(newLog) {
                 : "Today's session"}
             </Text>
 
-            {!showForm && (
-              <View style={styles.inlineButtonRow}>
+            {/* CHANGED: Generate Report + View Log History are now always visible
+                at the top of the page, regardless of form/dashboard state —
+                previously "Report" only showed when !showForm, and history was
+                only reachable from inside LogDetailView. Both still just open
+                their existing modals — no change to what they do. */}
+            <View style={styles.inlineButtonRow}>
+              <TouchableOpacity
+                style={styles.inlineRowBtn}
+                onPress={() => setViewingReport(true)}
+              >
+                <MaterialCommunityIcons
+                  name="chart-bar"
+                  size={16}
+                  color={colors.textOnPrimary}
+                  style={{ marginRight: spacing.xs }}
+                />
+                <Text style={styles.inlineRowBtnText}>Generate Report</Text>
+              </TouchableOpacity>
 
-                {/* Add Log Button Trigger — always available, opens a fresh blank form */}
-                <TouchableOpacity
-                  style={
-                    [styles.inlineRowBtn,
-                    isTodayAbsent && { backgroundColor: colors.border }]
-                  }
-                  onPress={() => setAddingLog(true)}
-                  disabled={isTodayAbsent}
-                >
-                  <MaterialCommunityIcons
-                    name="plus"
-                    size={16}
-                    color={colors.textOnPrimary}
-                    style={{ marginRight: spacing.xs }}
-                  />
-                  <Text style={styles.inlineRowBtnText}>Add Log</Text>
-                </TouchableOpacity>
-
-                {/* Report Generator Button Trigger */}
-                <TouchableOpacity 
-                  style={styles.inlineRowBtn} 
-                  onPress={() => setViewingReport(true)}
-                >
-                  <MaterialCommunityIcons 
-                    name="chart-bar" 
-                    size={16} 
-                    color={colors.textOnPrimary} 
-                    style={{ marginRight: spacing.xs }}
-                  />
-                  <Text style={styles.inlineRowBtnText}>Report</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              <TouchableOpacity
+                style={styles.inlineRowBtn}
+                onPress={() => setViewingHistory(true)}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={colors.textOnPrimary}
+                  style={{ marginRight: spacing.xs }}
+                />
+                <Text style={styles.inlineRowBtnText}>View Log History</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           
-          {!showForm && (
+          {/* {!showForm && (
             <View style={styles.loggedBadge}>
               <MaterialCommunityIcons name="check" size={12} color={colors.success} />
               <Text style={styles.loggedBadgeText}>Logged</Text>
             </View>
-          )}
+          )} */}
         </View>
 
-        <View style={styles.panelCard}>
-          {showForm ? (
+        {showForm ? (
+          <View style={styles.panelCard}>
             <AddLogForm
               onSubmit={editingLogId ? (fields) => handleUpdateLog(editingLogId, fields) : handleAddLog}
-              skipAttendanceStep={!!todayLog && addingLog}
+              // CHANGED: skip the attendance step only when we're adding an
+              // extra log for a day that's already attended — matches
+              // isAttendedToday instead of the old single-todayLog check.
+              skipAttendanceStep={isAttendedToday && addingLog}
+              // CHANGED: initialData now maps straight to the multi-range shape
+              // AddLogForm actually expects (`ranges`), instead of the old
+              // single surah/ayahStart/ayahEnd/type/grade fields which no
+              // longer exist on a fetched log.
               initialData={editingLog ? {
-                attendance:  editingLog.attendance || 'Present',
-                surah:       editingLog.surah,
-                surahName:   editingLog.surahName,
-                ayahStart:   editingLog.ayahStart,
-                ayahEnd:     editingLog.ayahEnd,
-                type:        editingLog.type,
-                grade:       editingLog.grade || 'pass',
+                attendance:  isAbsentLog(editingLog) ? ATTENDANCE_LABELS[editingLog.attendance] : 'Present',
                 behavior:    editingLog.behavior,
-                assignments: editingLog.assignments,
+                assignments: editingLog.comments,
+                ranges: (editingLog.ranges ?? []).map(r => ({ ...r, surahName: surahName(r.surah) })),
               } : undefined}
             />
-          ) : (
-            <LogDetailView
-              log={todayLog}
-              onEdit={() => setIsEditing(true)}
-              viewHistory={() => setViewingHistory(true)}
-            />
-          )}
-        </View>
+          </View>
+        ) : (
+          // ── CHANGED: New landing dashboard for an attended day ──
+          // Replaces LogDetailView. "Add Log" sits at the top (creates a
+          // brand-new Log row per your answer), followed by the highlighted
+          // "Today's Ranges" panel (hidden entirely if empty) and the plain
+          // "Recent Ranges" panel (up to 4 ranges from prior days).
+          <View>
+            <TouchableOpacity
+              style={[styles.inlineRowBtn, { marginBottom: spacing.lg }]}
+              onPress={() => setAddingLog(true)}
+            >
+              <MaterialCommunityIcons
+                name="plus"
+                size={16}
+                color={colors.textOnPrimary}
+                style={{ marginRight: spacing.xs }}
+              />
+              <Text style={styles.inlineRowBtnText}>Add Log</Text>
+            </TouchableOpacity>
+
+            {todaysRanges.length > 0 && (
+              <RangeGroupSection
+                title="Today's Ranges"
+                ranges={todaysRanges}
+                highlighted
+                onEditRange={(logId) => { setEditingLogId(logId); setAddingLog(false); }}
+                onDeleteRange={(logId) => handleDeleteLog(logId)}
+              />
+            )}
+
+            {recentRanges.length > 0 && (
+              <RangeGroupSection
+                title="Recent Ranges"
+                ranges={recentRanges}
+                onEditRange={(logId) => { setEditingLogId(logId); setAddingLog(false); }}
+                onDeleteRange={(logId) => handleDeleteLog(logId)}
+              />
+            )}
+          </View>
+        )}
 
         {(addingLog || editingLogId) && (
           <TouchableOpacity
@@ -466,22 +555,23 @@ async function handleAddLog(newLog) {
               {studentLogs.length === 0 ? (
                 <Text style={styles.emptyHistoryText}>No logs found for this student.</Text>
               ) : (
-                studentLogs.map((log) => (
+                // CHANGED: sort newest-first for display, since the backend
+                // doesn't guarantee ordering and a day can now contain
+                // multiple Log rows.
+                [...studentLogs]
+                  .sort((a, b) => (a.date < b.date ? 1 : -1))
+                  .map((log) => (
                   <View key={log.id} style={styles.historyCard}>
                     <View style={styles.historyCardHeader}>
-                      <Text style={styles.historyDate}>{log.date} ({log.type}) ({log.surahName})</Text>
+                      <Text style={styles.historyDate}>{log.date}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                        <View style={[
-                          styles.historyBadge, 
-                          { backgroundColor: log.grade === 'pass' ? colors.successBg : colors.dangerBg }
-                        ]}>
-                          <Text style={[
-                            styles.historyBadgeText, 
-                            { color: log.grade === 'pass' ? colors.success : colors.danger }
-                          ]}>
-                            {log.attendance === 'Absent' ? 'ABSENT' : log.grade?.toUpperCase()}
-                          </Text>
-                        </View>
+                        {isAbsentLog(log) && (
+                          <View style={[styles.historyBadge, { backgroundColor: colors.dangerBg }]}>
+                            <Text style={[styles.historyBadgeText, { color: colors.danger }]}>
+                              {(ATTENDANCE_LABELS[log.attendance] ?? 'Absent').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
                         <TouchableOpacity
                           onPress={() => {
                             setEditingLogId(log.id);
@@ -507,17 +597,38 @@ async function handleAddLog(newLog) {
                       </View>
                     </View>
 
-                    {log.attendance == 0 && (
+                    {isPresentLog(log) && (
                       <View style={styles.historyCardBody}>
-                        <Text style={styles.historyMainText}>
-                          {log.surahName} · Ayahs {log.ayahStart}–{log.ayahEnd}
-                        </Text>
-                        <Text style={styles.historySubText}>
-                          Type: {log.type.charAt(0).toUpperCase() + log.type.slice(1)} | Behavior: {log.behavior}/5
-                        </Text>
-                        {log.assignments ? (
+                        {log.ranges.map((range, idx) => (
+                          <View
+                            key={idx}
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: spacing.xs,
+                            }}
+                          >
+                            <Text style={styles.historyMainText} numberOfLines={1}>
+                              {surahName(range.surah)} · Ayahs {range.ayah_init}–{range.ayah_final}
+                            </Text>
+                            <View style={[
+                              styles.historyBadge,
+                              { backgroundColor: range.passed ? colors.successBg : colors.dangerBg },
+                            ]}>
+                              <Text style={[
+                                styles.historyBadgeText,
+                                { color: range.passed ? colors.success : colors.danger },
+                              ]}>
+                                {LOG_TYPE_LABELS[range.log_type] ?? range.log_type} · {range.passed ? 'PASS' : 'FAIL'}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                        <Text style={styles.historySubText}>Behavior: {log.behavior}/5</Text>
+                        {log.comments ? (
                           <View style={styles.historyNotesBox}>
-                            <Text style={styles.historyNotesText}>{log.assignments}</Text>
+                            <Text style={styles.historyNotesText}>{log.comments}</Text>
                           </View>
                         ) : null}
                       </View>
@@ -560,7 +671,7 @@ async function handleAddLog(newLog) {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.xl }}
             >
-              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl={apiBaseUrl} />
+              <ReportGenerator studentId={selectedId} logs={studentLogs} classroomId={course.id} apiBaseUrl = "https://lmsmasjid-backend.onrender.com"/>
             </ScrollView>
           </View>
         </View>
@@ -919,5 +1030,84 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.caption,
     color: colors.text,
     lineHeight: 16,
+  },
+
+  // ---------------------------------------------------------------------
+  // CHANGED: styles for RangeGroupSection — the "Today's Ranges" /
+  // "Recent Ranges" dashboard panels. `rangesSectionHighlighted` gives the
+  // bronze/cream brand treatment used for "Today's Ranges" per the
+  // reference screenshot; without it, the section stays a plain surface
+  // card (used for "Recent Ranges") so the two read as visually distinct.
+  // ---------------------------------------------------------------------
+  rangesSection: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    ...shadow,
+  },
+  rangesSectionHighlighted: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  rangesSectionTitle: {
+    fontSize: fonts.sizes.subtitle,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  rangesSectionTitleHighlighted: {
+    color: colors.primaryDark,
+  },
+  rangeTypeGroup: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    marginBottom: spacing.sm,
+  },
+  rangeTypeLabel: {
+    fontSize: fonts.sizes.body,
+    fontWeight: '700',
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  rangeItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  rangeItemText: {
+    fontSize: fonts.sizes.body,
+    fontWeight: '600',
+    color: colors.text,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  rangeItemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rangeBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  rangeBadgeText: {
+    fontSize: fonts.sizes.caption,
+    fontWeight: '700',
+  },
+  rangeItemIconBtn: {
+    padding: spacing.xs,
   },
 });

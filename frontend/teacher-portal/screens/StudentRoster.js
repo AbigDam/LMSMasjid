@@ -19,8 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api.js'
-import { brand }                                 from '../constants/brand';
-import { colors, radii, shadow, spacing }        from '../constants/theme';
+import { brand }                                 from '../constants/brand.js';
+import { colors, radii, shadow, spacing }        from '../constants/theme.js';
 
 // ---------------------------------------------------------------------------
 // Student row
@@ -147,7 +147,7 @@ useEffect(() => {
           renderItem={({ item }) => (
             <StudentRow
               student={item}
-              onPress={() => navigation.navigate('AddLog', { course: course, student: item })}
+              onPress={() => navigation.navigate('StudentView', { course: course, student: item })}
             />
           )}
           contentContainerStyle={styles.listContent}

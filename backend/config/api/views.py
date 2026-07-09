@@ -164,9 +164,7 @@ class ReportCardListCreateView(generics.ListCreateAPIView):
         return Response({"id": report_card.id}, status=status.HTTP_201_CREATED)
  
 
-
-
-
+ 
 class GetLogsView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         class_id = request.query_params.get('class_id')
@@ -174,7 +172,23 @@ class GetLogsView(generics.GenericAPIView):
             return Response({"error": "class_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         logs = Log.objects.filter(logged_by_id=class_id).select_related('student')
+        ranges = QuranRange.objects.filter(log__in=logs).select_related('log')
+        sortedRanges = {}
 
+        for log in logs:
+            log_id = log.log_id
+            if log_id not in sortedRanges:
+                sortedRanges[log_id] = []
+        
+        for range in ranges:
+            sortedRanges[range.log_id].append({
+                "surah": range.surah,
+                "ayah_init": range.ayah_init,
+                "ayah_final": range.ayah_final,
+                "passed": range.passed,
+                "log_type": LOG_TYPE_MAP.get(range.log_type, "unknown"),
+                })
+        
         result = {}
         for log in logs:
             student_id = log.student_id
@@ -184,14 +198,9 @@ class GetLogsView(generics.GenericAPIView):
                 result[student_id].append({
                     "id": log.log_id,
                     "date": log.date.isoformat(),
-                    "surah": log.surah,
-                    "surahName": quran_surahs[log.surah],
-                    "ayahStart": log.ayah_init,
-                    "ayahEnd": log.ayah_final,
-                    "type": LOG_TYPE_MAP.get(log.log_type, 'reading'),
                     "behavior": log.behavior,
                     "comments": log.comments,
-                    "grade": "pass" if log.passed else "fail",
+                    "ranges": sortedRanges.get(log.log_id, []),
                 })
             else:
                 result[student_id].append({

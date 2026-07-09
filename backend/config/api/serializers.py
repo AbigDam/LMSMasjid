@@ -178,38 +178,52 @@ class BehaviorLogSerializer(serializers.ModelSerializer):
         model = Behavior_Log
         fields = "__all__"
 
+class QuranRangeSerializer(serializers.Serializer):
+    passed = serializers.BooleanField(required=False)
+    log_type = serializers.IntegerField(required=False) # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+
+    surah = serializers.IntegerField()
+    ayah_init = serializers.IntegerField()
+    ayah_final = serializers.IntegerField()
+    
+
 class CreateLogSerializer(serializers.Serializer):
+    
     student_id = serializers.IntegerField()
     class_id = serializers.IntegerField()
-    surah = serializers.IntegerField(required=False)
-    starting_ayah = serializers.IntegerField(required=False)
-    ending_ayah = serializers.IntegerField(required=False)
-    passed = serializers.BooleanField(required=False)
     behavior = serializers.IntegerField(min_value=1, max_value=5, default=5)
     attendance = serializers.IntegerField(min_value=0, max_value=2, default=0) #0 - Present   1-Absent    2- Excused Absence
     comments = serializers.CharField(required=False, allow_blank=True, default="")
     date = serializers.DateField(default=datetime.date.today)
-    log_type = serializers.IntegerField(required=False) # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+    ranges = QuranRangeSerializer(many=True)
 
     def create(self, validated_data):
+        ranges_data = validated_data.pop("ranges")
+
         student = User.objects.get(id=validated_data["student_id"])
         classroom = Class.objects.get(class_id=validated_data["class_id"])
 
         log = Log.objects.create(
             student=student,
             logged_by=classroom,
-            surah=validated_data.get("surah", None),
-            ayah_init=validated_data.get("starting_ayah", None),
-            ayah_final=validated_data.get("ending_ayah", None),
-            passed=validated_data.get("passed", None),
             comments=validated_data.get("comments", ""),
             date=validated_data["date"],
             behavior=validated_data.get("behavior", None),
-            log_type=validated_data.get("log_type", None),
             attendance=validated_data.get("attendance", 0),
         )
+
+        for range_data in ranges_data:
+            QuranRange.objects.create(
+                log=log,
+                passed=range_data.get("passed", None),
+                log_type=range_data.get("log_type", None),
+                surah=range_data["surah"],
+                ayah_init=range_data["ayah_init"],
+                ayah_final=range_data["ayah_final"],
+            )
         return log
-        
+    
+      
 # ── Student ──────────────────────────────────────────────────────────────────
 class StudentSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)

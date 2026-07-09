@@ -13,8 +13,8 @@ import LoginScreen from './screens/LoginScreen';
 import SignupScreen from './screens/SignupScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import LoadingScreen from './screens/LoadingScreen';
-import AddLogScreen from './screens/AddLogScreen';
-import StudentViewScreen from './screens/StudentViewScreen';
+import StudentView from './screens/StudentView';
+import StudentViewScreen from './screens/StudentRoster';
 import CreateClassAccountsScreen from './screens/CreateClassAccountsScreen.js';
 import { AuthContext } from './context/AuthContext';
 import { colors, spacing, fonts, radii } from './constants/theme';
@@ -51,23 +51,23 @@ function AppLoadError({ message, onRetry }) {
 /* ---------------- APP STACK ---------------- */
 function AppStack({ user, userError, onRetryUser }) {
 
-  // console.log('Rendering AppStack with user:', user);
+  console.log('Rendering AppStack with user:', user);
 
   if (userError) {
     return <AppLoadError message={userError} onRetry={onRetryUser} />;
   }
-
+  
   switch (user.role_id) {
-    case 1: // Teacher
+    case 0: // Teacher
       return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
-          <Stack.Screen name="AddLog" component={AddLogScreen} />
+          <Stack.Screen name="StudentView" component={StudentView} />
           <Stack.Screen name="StudentRoster" component={StudentViewScreen} />
           <Stack.Screen name="CreateClassAccounts" component={CreateClassAccountsScreen} />
         </Stack.Navigator>
       );
-    case 3: // Admin
+    case 1: // Admin
       return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
@@ -136,6 +136,7 @@ export default function App() {
           // and if the access token is expired this transparently refreshes
           // and retries before ever reaching this catch block.
           const response = await api.get('/current_user/');
+          console.log('Fetched current user:', response.data);
           setUser(response.data);
         } catch (userErr) {
 

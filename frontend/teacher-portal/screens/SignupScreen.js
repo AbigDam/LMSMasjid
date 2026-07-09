@@ -65,8 +65,8 @@ function validate(trimmedUsername, trimmedEmail) {
 
   return next;
 }
-const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-console.log('API_URL:', API_URL); // Log the API URL to verify it's being read correctly
+const API_URL = process.env.EXPO_PUBLIC_BASE_URL;
+
 const { setAuthenticated } = useAuth();
 
 async function handleSignup() {
@@ -85,9 +85,9 @@ async function handleSignup() {
   }
 
   try {
-    console.log('Registering to :', `${API_URL}/register/`); // Log the API URL to verify it's being read correctly
+    console.log('Registering to :', `${API_URL}/api/register/`); // Log the API URL to verify it's being read correctly
     const response = await axios.post(
-      `${API_URL}/register/`,
+      `${API_URL}/api/register/`,
       {
         username: trimmedUsername,
         email: trimmedEmail,

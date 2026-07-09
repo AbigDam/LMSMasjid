@@ -141,10 +141,11 @@ export function AddLogForm({ onSubmit, initialData, skipAttendanceStep = false }
   const [selectedSurah, setSelectedSurah] = useState(initialSurahObj);
   const [ayahStart, setAyahStart]         = useState(initialData?.ayahStart ?? null);
   const [ayahEnd, setAyahEnd]             = useState(initialData?.ayahEnd ?? null);
-  const [readingType, setReadingType]     = useState(initialData?.type ?? 'memorization');
+  const [readingType, setReadingType]     = useState(initialData?.type ?? 'Memorization');
   const [selectedGrade, setGrade]         = useState(initialData?.grade ?? 'pass');
   const [behavior, setBehavior]           = useState(initialData?.behavior ?? 5);
   const [assignments, setAssignments]     = useState(initialData?.assignments ?? '');
+  const [ranges, setRanges]                 = useState(initialData?.ranges ?? []);
 
   const [surahModalVisible,     setSurahModalVisible]     = useState(false);
   const [startAyahModalVisible, setStartAyahModalVisible] = useState(false);
@@ -160,7 +161,37 @@ export function AddLogForm({ onSubmit, initialData, skipAttendanceStep = false }
     : [];
 
   const isAbsent = attendance === 'Absent' || attendance === 'Excused Absence';
-  const canStep2 = selectedSurah !== null && ayahStart !== null && ayahEnd !== null;
+  const canStep2 = ranges.length > 0;
+
+
+  const canAddRange = selectedSurah !== null && ayahStart !== null && ayahEnd !== null;
+
+  const handleAddRange = () => {
+    if (!canAddRange) return;
+
+    setRanges(prev => [
+      {
+        log_type: readingType === 'Memorization' ? 1 : 2,
+        passed: selectedGrade === 'pass',
+        surah: selectedSurah?.number,
+        surahName: selectedSurah?.name,
+        ayah_init: ayahStart,
+        ayah_final: ayahEnd,
+      },
+      ...prev,
+    ]);
+
+    // Clear the inputs so the sub-section is ready for another range.
+    setSelectedSurah(null);
+    setAyahStart(null);
+    setAyahEnd(null);
+    setReadingType('Memorization');
+    setGrade('pass');
+  };
+
+  const removeRange = (index) => {
+    setRanges(prev => prev.filter((_, i) => i !== index));
+  };
 
   function handleNext() {
     if (currentStep === 1) { isAbsent ? handleSubmit() : setCurrentStep(2); }
@@ -174,19 +205,17 @@ export function AddLogForm({ onSubmit, initialData, skipAttendanceStep = false }
 
   function handleSubmit() {
     onSubmit({
-      surah:       selectedSurah?.number,
       attendance,
-      surahName:   selectedSurah?.name,
-      ayahStart:   ayahStart ?? undefined,
-      ayahEnd:     ayahEnd   ?? undefined,
-      type:        readingType,
       behavior,
-      grade:       selectedGrade,
-      assignments: assignments.trim() || undefined,
+      type: readingType,
+      comments: assignments.trim() || undefined,
+      ranges: ranges,
+      
     });
+
     // Reset to defaults after submission.
     setSelectedSurah(null); setAyahStart(null); setAyahEnd(null);
-    setReadingType('memorization'); setBehavior(5);
+    setReadingType('Memorization'); setBehavior(5);
     setAttendance('Present'); setGrade('pass');
     setAssignments(''); setCurrentStep(1);
   }
@@ -238,64 +267,104 @@ export function AddLogForm({ onSubmit, initialData, skipAttendanceStep = false }
         </View>
       )}
 
-      {/* ── STEP 2: Surah + ayah range + type + grade + behavior ── */}
+     {/* ── STEP 2: Surah + ayah range + type + grade + behavior ── */}
       {currentStep === 2 && !isAbsent && (
         <View>
-          <SectionLabel text="Surah" />
-          <TouchableOpacity
-            style={[s.picker, { backgroundColor: theme.backgroundElement, borderColor: colors.border }]}
-            onPress={() => setSurahModalVisible(true)}
-          >
-            <Text style={{ color: selectedSurah ? theme.text : colors.textMuted, fontSize: 15 }}>
-              {selectedSurah ? `${selectedSurah.number}. ${selectedSurah.name}` : 'Select Surah'}
-            </Text>
-            <Text style={{ color: colors.textMuted }}>›</Text>
-          </TouchableOpacity>
+          {/* ── Added ranges list ── */}
+          {ranges.length > 0 && (
+            <View style={{ marginBottom: spacing.md }}>
+              <SectionLabel text={`Ranges Added (${ranges.length})`} />
+              {ranges.map((range, index) => (
+                <View
+                  key={index}
+                  style={[s.rangeCard, { backgroundColor: theme.backgroundElement, borderColor: colors.border }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.rangeCardTitle, { color: theme.text }]}>
+                      {range.surahName ?? `Surah ${range.surah}`} · {range.ayah_init}-{range.ayah_final}
+                    </Text>
+                    <Text style={[s.rangeCardSubtitle, { color: colors.textMuted }]}>
+                      {range.log_type === 1 ? 'Memorization' : 'Review'} · {range.passed ? 'Pass ✓' : 'Fail ✗'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={s.rangeCardRemove}
+                    onPress={() => removeRange(index)}
+                    hitSlop={8}
+                  >
+                    <Text style={s.rangeCardRemoveText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
 
-          <View style={s.row}>
-            <View style={{ flex: 1 }}>
-              <SectionLabel text="Ayah Start" />
-              <TouchableOpacity
-                style={[s.picker, { backgroundColor: theme.backgroundElement, borderColor: colors.border }, !selectedSurah && s.pickerDisabled]}
-                onPress={() => selectedSurah && setStartAyahModalVisible(true)}
-                disabled={!selectedSurah}
-              >
-                <Text style={{ color: ayahStart ? theme.text : colors.textMuted, fontSize: 15 }}>
-                  {ayahStart ?? 'Select'}
-                </Text>
-                <Text style={{ color: colors.textMuted }}>›</Text>
-              </TouchableOpacity>
+          {/* ── New range entry sub-section ── */}
+          <View style={[s.rangeFormBox, { borderColor: colors.border }]}>
+            <SectionLabel text="Surah" />
+            <TouchableOpacity
+              style={[s.picker, { backgroundColor: theme.backgroundElement, borderColor: colors.border }]}
+              onPress={() => setSurahModalVisible(true)}
+            >
+              <Text style={{ color: selectedSurah ? theme.text : colors.textMuted, fontSize: 15 }}>
+                {selectedSurah ? `${selectedSurah.number}. ${selectedSurah.name}` : 'Select Surah'}
+              </Text>
+              <Text style={{ color: colors.textMuted }}>›</Text>
+            </TouchableOpacity>
+
+            <View style={s.row}>
+              <View style={{ flex: 1 }}>
+                <SectionLabel text="Ayah Start" />
+                <TouchableOpacity
+                  style={[s.picker, { backgroundColor: theme.backgroundElement, borderColor: colors.border }, !selectedSurah && s.pickerDisabled]}
+                  onPress={() => selectedSurah && setStartAyahModalVisible(true)}
+                  disabled={!selectedSurah}
+                >
+                  <Text style={{ color: ayahStart ? theme.text : colors.textMuted, fontSize: 15 }}>
+                    {ayahStart ?? 'Select'}
+                  </Text>
+                  <Text style={{ color: colors.textMuted }}>›</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ flex: 1 }}>
+                <SectionLabel text="Ayah End" />
+                <TouchableOpacity
+                  style={[s.picker, { backgroundColor: theme.backgroundElement, borderColor: colors.border }, !ayahStart && s.pickerDisabled]}
+                  onPress={() => ayahStart && setEndAyahModalVisible(true)}
+                  disabled={!ayahStart}
+                >
+                  <Text style={{ color: ayahEnd ? theme.text : colors.textMuted, fontSize: 15 }}>
+                    {ayahEnd ?? 'Select'}
+                  </Text>
+                  <Text style={{ color: colors.textMuted }}>›</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <SectionLabel text="Ayah End" />
-              <TouchableOpacity
-                style={[s.picker, { backgroundColor: theme.backgroundElement, borderColor: colors.border }, !ayahStart && s.pickerDisabled]}
-                onPress={() => ayahStart && setEndAyahModalVisible(true)}
-                disabled={!ayahStart}
-              >
-                <Text style={{ color: ayahEnd ? theme.text : colors.textMuted, fontSize: 15 }}>
-                  {ayahEnd ?? 'Select'}
-                </Text>
-                <Text style={{ color: colors.textMuted }}>›</Text>
-              </TouchableOpacity>
-            </View>
+
+            <SectionLabel text="Session Type" />
+            <SegmentControl
+              options={[{ label: 'Memorization', value: 'Memorization' }, { label: 'Review', value: 'Review' }]}
+              value={readingType}
+              onChange={setReadingType}
+              theme={theme}
+            />
+
+            <SectionLabel text="Grade" />
+            <SegmentControl
+              options={[{ label: 'Pass ✓', value: 'pass' }, { label: 'Fail ✗', value: 'fail' }]}
+              value={selectedGrade}
+              onChange={setGrade}
+              theme={theme}
+            />
+
+            <TouchableOpacity
+              style={[s.addRangeBtn, !canAddRange && s.addRangeBtnDisabled]}
+              onPress={handleAddRange}
+              disabled={!canAddRange}
+            >
+              <Text style={[s.addRangeBtnText, !canAddRange && s.addRangeBtnTextDisabled]}>+ Add Range</Text>
+            </TouchableOpacity>
           </View>
-
-          <SectionLabel text="Session Type" />
-          <SegmentControl
-            options={[{ label: 'Memorization', value: 'memorization' }, { label: 'Review', value: 'review' }]}
-            value={readingType}
-            onChange={setReadingType}
-            theme={theme}
-          />
-
-          <SectionLabel text="Grade" />
-          <SegmentControl
-            options={[{ label: 'Pass ✓', value: 'pass' }, { label: 'Fail ✗', value: 'fail' }]}
-            value={selectedGrade}
-            onChange={setGrade}
-            theme={theme}
-          />
 
           <SectionLabel text="Behavior" />
           <View style={s.behaviorRow}>
@@ -346,7 +415,6 @@ export function AddLogForm({ onSubmit, initialData, skipAttendanceStep = false }
                 label={initialData ? 'Save Changes' : 'Submit Log'}
                 onPress={() => {
                   handleSubmit();
-                  alert("Log has been submitted successfully!");
                 }}
               />
             </View>
@@ -418,6 +486,45 @@ const s = StyleSheet.create({
   },
   pickerDisabled: { opacity: 0.4 },
   row: { flexDirection: 'row', gap: spacing.md },
+
+  // Multi-range: bordered sub-section for entering a new range
+  rangeFormBox: {
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  addRangeBtn: {
+    marginTop: spacing.lg,
+    paddingVertical: 12,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+  },
+  addRangeBtnDisabled: { backgroundColor: colors.disabled },
+  addRangeBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  addRangeBtnTextDisabled: { color: colors.textMuted },
+
+  // Multi-range: list of already-added ranges
+  rangeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  rangeCardTitle: { fontSize: 15, fontWeight: '700' },
+  rangeCardSubtitle: { fontSize: 13, marginTop: 2 },
+  rangeCardRemove: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.sm,
+  },
+  rangeCardRemoveText: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
 
   // Behavior score buttons
   behaviorRow: { flexDirection: 'row', gap: spacing.sm },

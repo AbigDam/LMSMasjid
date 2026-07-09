@@ -26,7 +26,7 @@ class Audit_Log(models.Model):
 
 class Class(models.Model):
     class_id = models.BigAutoField(primary_key=True)
-    teachers = models.JSONField(list) #List of teacher IDs
+    teachers = models.JSONField(list, null=True) #List of teacher IDs
     students = models.JSONField(list, blank = True, null=True) #List of student IDs
     class_name = models.CharField(max_length=255, blank=True, null=True)
     program = models.CharField(max_length=255, blank=True, null=True)
@@ -48,15 +48,22 @@ class Log(models.Model):
     log_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reading_log")
     logged_by = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="student_reading_log")
-    surah = models.IntegerField(null=True, blank=True)
-    ayah_init = models.IntegerField(null=True, blank=True)
-    ayah_final = models.IntegerField(null=True, blank=True)
-    passed = models.BooleanField(null=True, blank=True)
+    
     comments = models.CharField(max_length=1000, null= True, blank= True)
     date = models.DateField()
     behavior = models.IntegerField(default = 5,null=True, blank=True) 
     attendance = models.IntegerField(default = 0) #0 - Present   1-Absent    2- Excused Absence
+
+
+class QuranRange(models.Model):
+    log = models.ForeignKey(Log, related_name="ranges", on_delete=models.CASCADE)
+
+    passed = models.BooleanField(null=True, blank=True)
     log_type = models.IntegerField(null=True, blank=True) # 0 - "Reading Log"   1 - "Memorization Log"   2 - "Review Log"
+    surah = models.PositiveSmallIntegerField()
+    ayah_init = models.PositiveSmallIntegerField()
+    ayah_final = models.PositiveSmallIntegerField()
+    
 
 
 class Behavior_Log(models.Model):
