@@ -22,6 +22,8 @@ import { colors, spacing, fonts, radii } from './constants/theme';
 /* Admin Screens */
 import AdminDashboardScreen from './admin-portal/AdminDashboardScreen';
 import ManageCourses from './admin-portal/ManageCourses';
+import CourseView from './admin-portal/CourseView';
+import EditClass from './admin-portal/EditClass';
 
 const Stack = createNativeStackNavigator();
 
@@ -71,7 +73,10 @@ function AppStack({ user, userError, onRetryUser }) {
       return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
-          {/* <Stack.Screen name="ManageCourses" component={ManageCourses} /> */}
+          <Stack.Screen name="ManageCourses" component={ManageCourses} />
+          <Stack.Screen name="CourseView" component={CourseView} />
+          <Stack.Screen name="EditClass" component={EditClass} />
+          <Stack.Screen name="CreateClassAccounts" component={CreateClassAccountsScreen} />
         </Stack.Navigator>
       );
     default:

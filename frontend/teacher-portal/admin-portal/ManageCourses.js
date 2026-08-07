@@ -1,854 +1,243 @@
-// screens/AddLogScreen.js
+// screens/ManageCourses.js
 // -----------------------------------------------------------------------------
-// Teacher daily log screen. Three inline sections:
+// Al-Hidaya — Admin: Manage Courses
 //
-//   1. Student roster — all students in the class, coloured dot showing
-//      whether a log exists for today. Tap to select.
+// Loads every class/course and renders each as a CourseCard. Tapping a card
+// opens CourseView (read-only detail + Edit entry point). The "Add Course"
+// button reuses the existing CreateClassAccountsScreen flow.
 //
-//   2. Log panel — if the selected student already has a log for today,
-//      show it with an Edit button (opens AddLogForm inline).
-//      If no log yet, show the AddLogForm directly so the teacher can log now.
+// Layout/chrome (AdminSidebar, responsive breakpoint, mobile drawer, header)
+// mirrors DashboardScreen exactly via the shared useAdminLayout hook, so the
+// admin experience is consistent across screens.
 //
-//   3. Report Generator — scoped to the selected student's full log history.
-//
-// TODO (Django):
-//   - Replace MOCK_STUDENTS with GET /api/students/?classroom=<id>
-//   - Replace INITIAL_LOGS  with GET /api/logs/?student=<id>
-//   - handleAddLog    → POST  /api/logs/
-//   - handleUpdateLog → PATCH /api/logs/<id>/
+// Data:
+//   GET /select_classes/  → array of course objects
 // -----------------------------------------------------------------------------
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Modal,
+  View,
+  Text,
+  Image,
   Pressable,
   ScrollView,
+  Animated,
+  ActivityIndicator,
   StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import api from '../api.js';
+import AdminSidebar from '../components/AdminSidebar';
+import CourseCard from '../components/CourseCard';
+import { brand, brandImages } from '../constants/brand';
+import useAdminLayout, { DRAWER_WIDTH } from '../components/useAdminLayout';
 
-import { AddLogForm }      from '../components/AddLogForm';
-import { ReportGenerator } from '../components/ReportGenerator';
-import { brand }           from '../constants/brand';
-import { colors, fonts, radii, shadow, spacing } from '../constants/theme';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-const TODAY = new Date().toISOString().split('T')[0];
-
-const MOCK_STUDENTS = [
-  { id: 1, name: 'Ahmad Al-Farsi',    initials: 'AF' },
-  { id: 2, name: 'Yusuf Khalid',      initials: 'YK' },
-  { id: 3, name: 'Mariam Hassan',     initials: 'MH' },
-  { id: 4, name: 'Bilal Osman',       initials: 'BO' },
-  { id: 5, name: 'Fatima Al-Zahra',   initials: 'FZ' },
-];
-
-// Keyed by studentId → array of LogEntry.
-// Only student 1 and 3 have a log for today so the "needs log" dot is visible
-// on the others.
-const MOCK_LOGS = {
-  1: [
-    {
-      id: 101, date: TODAY,
-      surah: 2, surahName: 'Al-Baqarah', ayahStart: 11, ayahEnd: 20,
-      type: 'memorization', behavior: 5, grade: 'pass',
-      assignments: 'Memorize ayahs 21-25. Focus on tajweed.',
-    },
-    {
-      id: 102, date: '2026-05-30',
-      surah: 2, surahName: 'Al-Baqarah', ayahStart: 1, ayahEnd: 10,
-      type: 'review', behavior: 3, grade: 'pass',
-      assignments: 'Review old juz.',
-    },
-  ],
-  2: [
-    {
-      id: 201, date: '2026-05-28',
-      surah: 1, surahName: 'Al-Fatihah', ayahStart: 1, ayahEnd: 7,
-      type: 'memorization', behavior: 5, grade: 'pass',
-      assignments: 'Perfect letter pronunciation.',
-    },
-  ],
-  3: [
-    {
-      id: 301, date: TODAY,
-      surah: 3, surahName: 'Ali Imran', ayahStart: 1, ayahEnd: 5,
-      type: 'review', behavior: 4, grade: 'pass',
-      assignments: 'Continue revision.',
-    },
-  ],
-  4: [],
-  5: [],
+const BRONZE_COLORS = {
+  bronzeAccent: '#9A6A3C',
+  bgCanvas: '#FAF9F6',
+  surfaceWhite: '#FFFFFF',
+  textDark: '#111827',
+  textMuted: '#4B5563',
+  borderLight: '#E5E7EB',
 };
 
+export default function ManageCourses({ navigation }) {
+  const layout = useAdminLayout();
+  const { isWide, sidebarVisible, setSidebarVisible, menuOpen, setMenuOpen, translateX, backdrop, admin, handleSignOut } = layout;
 
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function hasLogToday(logs) {
-  return logs.some(l => l.date === TODAY);
-}
-
-function getTodayLog(logs) {
-  return logs.find(l => l.date === TODAY) ?? null;
-}
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-/** Single student pill in the roster */
-function StudentChip({ student, logs, selected, onPress }) {
-  const logged = hasLogToday(logs);
-  return (
-    <TouchableOpacity
-      style={[
-        styles.chip,
-        selected && styles.chipSelected,
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      {/* Avatar */}
-      <View style={[styles.chipAvatar, selected && styles.chipAvatarSelected]}>
-        <Text style={[styles.chipInitials, selected && styles.chipInitialsSelected]}>
-          {student.first_name.charAt(0)}{student.last_name.charAt(0)}
-        </Text>
-      </View>
-
-      <Text
-        style={[styles.chipName, selected && styles.chipNameSelected]}
-        numberOfLines={1}
-      >
-        {student.first_name + " " + student.last_name}
-      </Text>
-
-      {/* Status dot — amber = needs log, green = logged */}
-      <View style={[styles.statusDot, { backgroundColor: logged ? colors.success : colors.accent }]} />
-    </TouchableOpacity>
-  );
-}
-
-/** Compact read-only view of a log entry */
-function LogDetailView({ log, onEdit, viewHistory }) {
-  const isAbsent = log.attendance === 'Absent' || log.attendance === 'Excused Absence';
-  return (
-    <View>
-      <View style={styles.loggedBanner}>
-        <MaterialCommunityIcons name="check-circle-outline" size={16} color={colors.success} />
-        <Text style={styles.loggedBannerText}>Log recorded for today</Text>
-      </View>
-
-      <View style={styles.detailCard}>
-        {isAbsent ? (
-          <DetailRow label="Attendance" value={log.attendance} bold />
-        ) : (
-          <>
-            <DetailRow label="Attendance" value={log.attendance || 'Present'} />
-            <DetailRow
-              label="Surah & Ayahs"
-              value={`${log.surahName} · Ayahs ${log.ayahStart}–${log.ayahEnd}`}
-            />
-            <DetailRow
-              label="Session Type"
-              value={log.type.charAt(0).toUpperCase() + log.type.slice(1)}
-            />
-            <DetailRow
-              label="Grade"
-              value={log.grade?.toUpperCase() ?? 'N/A'}
-              bold
-              valueColor={log.grade === 'pass' ? colors.success : colors.danger}
-            />
-            <DetailRow label="Behavior" value={`${log.behavior} / 5`} />
-            {log.assignments ? (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Assignments & Comments</Text>
-                <View style={styles.assignmentBox}>
-                  <Text style={styles.assignmentText}>{log.assignments}</Text>
-                </View>
-              </View>
-            ) : null}
-          </>
-        )}
-      </View>
-
-      <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-        <Ionicons name="pencil-outline" size={15} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
-        <Text style={styles.editBtnText}>Edit Log</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.viewHistoryBtn} onPress={viewHistory}>
-        <Ionicons name="time-outline" size={17} color={colors.textOnPrimary} style={{ marginRight: spacing.xs }} />
-        <Text style={styles.viewHistoryBtnText}>View Log History</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function DetailRow({ label, value, bold = false, valueColor }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={[
-        styles.detailValue,
-        bold && { fontWeight: '700' },
-        valueColor && { color: valueColor },
-      ]}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-/** Dot legend at top of roster */
-function DotLegend() {
-  return (
-    <View style={styles.legend}>
-      <View style={styles.legendItem}>
-        <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-        <Text style={styles.legendText}>Logged today</Text>
-      </View>
-      <View style={styles.legendItem}>
-        <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
-        <Text style={styles.legendText}>Needs log</Text>
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main screen
-// ---------------------------------------------------------------------------
-export default function AddLogScreen({ navigation, route }) {
-  const { className = 'Quran Class A' } = route.params ?? {};
-
-  // All logs keyed by studentId — in real app, fetched per student on select.
-  const [allLogs, setAllLogs] = useState(MOCK_LOGS);
-
-  const [selectedId,   setSelectedId]   = useState(MOCK_STUDENTS[0].id);
-  const [isEditing,    setIsEditing]     = useState(false);
-  const [viewingHistory, setViewingHistory] = useState(false);
-  const [reportExpanded, setReportExpanded] = useState(false);
-
-  const selectedStudent = MOCK_STUDENTS.find(s => s.id === selectedId);
-  const studentLogs     = allLogs[selectedId] ?? [];
-  const todayLog        = getTodayLog(studentLogs);
-
-  // Show the form when: no log today, OR teacher clicked Edit.
-  const showForm = !todayLog || isEditing;
-
-  //Load Students
-  const [students, setStudents] = useState([]);
-
-  useEffect(() => {
-    async function loadStudents() {
-      try {
-        const token = await AsyncStorage.getItem('authToken');
-
-        const response = await axios.get(
-          `https://lmsmasjid-backend.onrender.com/api/select_students/${course.id}/`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        )
-
-        setStudents(response.data);
-        alert("THis: "+JSON.stringify(response.data));
-      } catch (error) {
-        console.error(error);
-      }
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get('/select_classes/');
+      setCourses(response.data ?? []);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to load courses.');
+    } finally {
+      setLoading(false);
     }
-
-    loadStudents();
   }, []);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-  function handleSelectStudent(id) {
-    setSelectedId(id);
-    setIsEditing(false);   // reset edit state when switching students
-    setViewingHistory(false);
-    setReportExpanded(false);
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  function handleNavigateClass(course) {
+    navigation.navigate('CourseView', { course });
+    setMenuOpen(false);
   }
-
-  function handleAddLog(newLog) {
-    // TODO (Django): POST /api/logs/ with { ...newLog, student: selectedId }
-    const entry = { id: Date.now(), date: TODAY, ...newLog };
-    setAllLogs(prev => ({
-      ...prev,
-      [selectedId]: [entry, ...(prev[selectedId] ?? [])],
-    }));
-    setIsEditing(false);
-    setViewingHistory(false);
-  }
-
-  function handleUpdateLog(updatedFields) {
-    // TODO (Django): PATCH /api/logs/<todayLog.id>/
-    setAllLogs(prev => ({
-      ...prev,
-      [selectedId]: (prev[selectedId] ?? []).map(l =>
-        l.id === todayLog.id ? { ...l, ...updatedFields } : l
-      ),
-    }));
-    setIsEditing(false);
-    setViewingHistory(false);
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  const { course } = route.params;
-
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
-
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={8}
-          style={styles.backBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <View style={styles.topBarCenter}>
-          <Text style={styles.topBarTitle} numberOfLines={1}>Daily Logs</Text>
-          <Text style={styles.topBarSub}   numberOfLines={1}>{className}</Text>
-        </View>
-        <View style={styles.headerBadge}>
-          <Ionicons name="book-outline" size={13} color={colors.primaryDark} />
-          <Text style={styles.headerBadgeText}>{brand.portal}</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-
-      <View>
-        <Text style={styles.h2}>{course.title}</Text>
-      </View>
-
-        {/* ── SECTION 1: Student roster ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.h2}>Students</Text>
-          <DotLegend />
-        </View>
-
-        <View style={styles.rosterCard}>
-          {students.map(student => (
-            <StudentChip
-              key={student.id}
-              student={student}
-              logs={allLogs[student.id] ?? []}
-              selected={student.id === selectedId}
-              onPress={() => handleSelectStudent(student.id)}
-            />
-          ))}
-        </View>
-
-        {/* ── SECTION 2: Log panel ── */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.h2}>{selectedStudent?.name}</Text>
-            <Text style={styles.subtext}>
-              {showForm
-                ? isEditing ? 'Editing today\'s log' : 'No log yet — record now'
-                : 'Today\'s session'}
-            </Text>
-          </View>
-          {/* If viewing a log, show the "Logged ✓" badge */}
-          {!showForm && (
-            <View style={styles.loggedBadge}>
-              <MaterialCommunityIcons name="check" size={12} color={colors.success} />
-              <Text style={styles.loggedBadgeText}>Logged</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.panelCard}>
-          {showForm ? (
-            <AddLogForm
-              onSubmit={isEditing ? handleUpdateLog : handleAddLog}
-              initialData={isEditing && todayLog ? {
-                attendance:  todayLog.attendance || 'Present',
-                surah:       todayLog.surah,
-                surahName:   todayLog.surahName,
-                ayahStart:   todayLog.ayahStart,
-                ayahEnd:     todayLog.ayahEnd,
-                type:        todayLog.type,
-                grade:       todayLog.grade || 'pass',
-                behavior:    todayLog.behavior,
-                assignments: todayLog.assignments,
-              } : undefined}
-            />
+      {/* Top Header Bar */}
+      <View style={styles.hubHeader}>
+        <View style={styles.headerLeft}>
+          {isWide ? (
+            <Pressable
+              onPress={() => setSidebarVisible(!sidebarVisible)}
+              style={styles.menuIconButton}
+              hitSlop={12}
+            >
+              <Ionicons name={sidebarVisible ? 'close' : 'menu'} size={28} color={BRONZE_COLORS.bronzeAccent} />
+            </Pressable>
           ) : (
-            <LogDetailView
-              log={todayLog}
-              onEdit={() => setIsEditing(true)}
-              viewHistory={() => setViewingHistory(true)}
-            />
+            <Pressable onPress={() => setMenuOpen(true)} style={styles.menuIconButton} hitSlop={12}>
+              <Ionicons name="menu" size={28} color={BRONZE_COLORS.bronzeAccent} />
+            </Pressable>
           )}
+          <Image source={brandImages.logo} style={styles.hubLogo} resizeMode="contain" />
+          <Text style={styles.hubTitle}>{brand.name}</Text>
         </View>
 
-        {/* ── SECTION 3: Report Generator ── */}
-        <TouchableOpacity
-          style={styles.reportToggle}
-          onPress={() => setReportExpanded(v => !v)}
-        >
-          <MaterialCommunityIcons
-            name={reportExpanded ? 'chevron-down' : 'chevron-right'}
-            size={18}
-            color={colors.text}
-            style={{ marginRight: spacing.sm }}
-          />
-          <Text style={styles.reportToggleText}>
-            Generate Report — {selectedStudent?.name}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <View style={styles.adminBadgeContainer}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.adminBadgeText}>{admin?.first_name} {admin?.last_name}</Text>
+          </View>
+          <Pressable onPress={handleSignOut} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={26} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </View>
 
-        {reportExpanded && (
-          <View style={styles.reportBody}>
-            <ReportGenerator studentId={selectedId} logs={studentLogs} />
+      <View style={styles.mainLayout}>
+        {/* Desktop AdminSidebar */}
+        {isWide && sidebarVisible && (
+          <View style={styles.desktopNavWrapper}>
+            <AdminSidebar
+              courses={courses}
+              onNavigate={handleNavigateClass}
+              onSignOut={handleSignOut}
+              onClose={() => setSidebarVisible(false)}
+            />
           </View>
         )}
 
-        <View style={{ height: spacing.xxl }} />
-      </ScrollView>
-      
-      {/* Log history modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={viewingHistory}
-        onRequestClose={() => setViewingHistory(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Log History</Text>
-                <Text style={styles.modalSub}>{selectedStudent?.name}</Text>
-              </View>
-              <TouchableOpacity 
-                onPress={() => setViewingHistory(false)}
-                style={styles.closeModalBtn}
-              >
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Modal Body (Scrollable History List) */}
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: spacing.xl }}
+        {/* Content */}
+        <ScrollView contentContainerStyle={styles.scrollCanvas} showsVerticalScrollIndicator={false}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionTitleIndicator} />
+            <Text style={styles.sectionTitleText}>Manage Courses</Text>
+            <View style={{ flex: 1 }} />
+            <Pressable
+              style={styles.createClassButton}
+              onPress={() => navigation.navigate('CreateClassAccounts')}
             >
-              {studentLogs.length === 0 ? (
-                <Text style={styles.emptyHistoryText}>No logs found for this student.</Text>
-              ) : (
-                studentLogs.map((log) => (
-                  <View key={log.id} style={styles.historyCard}>
-                    <View style={styles.historyCardHeader}>
-                      <Text style={styles.historyDate}>{log.date}</Text>
-                      <View style={[
-                        styles.historyBadge, 
-                        { backgroundColor: log.grade === 'pass' ? colors.successBg : colors.dangerBg }
-                      ]}>
-                        <Text style={[
-                          styles.historyBadgeText, 
-                          { color: log.grade === 'pass' ? colors.success : colors.danger }
-                        ]}>
-                          {log.attendance === 'Absent' ? 'ABSENT' : log.grade?.toUpperCase()}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {log.attendance !== 'Absent' && (
-                      <View style={styles.historyCardBody}>
-                        <Text style={styles.historyMainText}>
-                          {log.surahName} · Ayahs {log.ayahStart}–{log.ayahEnd}
-                        </Text>
-                        <Text style={styles.historySubText}>
-                          Type: {log.type.charAt(0).toUpperCase() + log.type.slice(1)} | Behavior: {log.behavior}/5
-                        </Text>
-                        {log.assignments ? (
-                          <View style={styles.historyNotesBox}>
-                            <Text style={styles.historyNotesText}>{log.assignments}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    )}
-                  </View>
-                ))
-              )}
-            </ScrollView>
+              <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.createClassButtonText}>Add Course</Text>
+            </Pressable>
           </View>
+
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={BRONZE_COLORS.bronzeAccent} />
+            </View>
+          ) : error ? (
+            <View style={styles.center}>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable onPress={fetchCourses} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : courses.length === 0 ? (
+            <View style={styles.center}>
+              <Ionicons name="school-outline" size={48} color={BRONZE_COLORS.textMuted} />
+              <Text style={styles.emptyText}>No courses yet. Tap "Add Course" to create one.</Text>
+            </View>
+          ) : (
+            <View style={styles.cardGrid}>
+              {courses.map((course) => (
+                <View key={course.id ?? course._id} style={styles.cardContainer}>
+                  <CourseCard
+                    course={course}
+                    onViewDetails={() => navigation.navigate('CourseView', { course })}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+
+      {/* Slide-out Mobile Drawer */}
+      {!isWide && (
+        <View style={StyleSheet.absoluteFill} pointerEvents={menuOpen ? 'auto' : 'none'}>
+          <Animated.View style={[styles.mobileBackdropLayer, { opacity: backdrop }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
+          </Animated.View>
+
+          <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
+            <AdminSidebar
+              courses={courses}
+              onNavigate={handleNavigateClass}
+              onSignOut={handleSignOut}
+              onClose={() => setMenuOpen(false)}
+            />
+          </Animated.View>
         </View>
-      </Modal>
+      )}
     </SafeAreaView>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.xl, paddingBottom: 60 },
+  safe: { flex: 1, backgroundColor: BRONZE_COLORS.bronzeAccent },
+  mainLayout: { flex: 1, flexDirection: 'row', backgroundColor: BRONZE_COLORS.bgCanvas },
+  desktopNavWrapper: { width: DRAWER_WIDTH, backgroundColor: '#ffffff', borderRightWidth: 1, borderRightColor: BRONZE_COLORS.borderLight },
 
-  // Top bar
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backBtn:      { padding: spacing.xs },
-  topBarCenter: { flex: 1 },
-  topBarTitle: {
-    fontSize: fonts.sizes.subtitle,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  topBarSub: {
-    fontSize: fonts.sizes.caption,
-    color: colors.textMuted,
-    marginTop: 1,
-  },
-  headerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-  },
-  headerBadgeText: {
-    color: colors.primaryDark,
-    fontWeight: '700',
-    fontSize: fonts.sizes.caption,
-  },
-
-  // Section headers
-  sectionHeader: {
+  hubHeader: {
+    height: 76,
+    backgroundColor: BRONZE_COLORS.surfaceWhite,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    marginTop: spacing.lg,
+    paddingHorizontal: 24,
+    borderBottomWidth: 4,
+    borderBottomColor: BRONZE_COLORS.bronzeAccent,
   },
-  h2:      { fontSize: fonts.sizes.title, fontWeight: '800', color: colors.text },
-  subtext: { fontSize: fonts.sizes.body,  color: colors.textMuted, marginTop: spacing.xs },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  menuIconButton: { padding: 4, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
+  hubLogo: { width: 46, height: 46, borderRadius: 10 },
+  hubTitle: { fontSize: 20, fontWeight: '700', color: BRONZE_COLORS.textDark, letterSpacing: 0.3 },
 
-  // ── Roster ──
-  rosterCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    ...shadow,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  chipSelected: {
-    backgroundColor: colors.primaryLight,
-  },
-  chipAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipAvatarSelected: {
-    backgroundColor: colors.primary,
-  },
-  chipInitials: {
-    fontSize: fonts.sizes.caption,
-    fontWeight: '800',
-    color: colors.textMuted,
-  },
-  chipInitialsSelected: {
-    color: colors.textOnPrimary,
-  },
-  chipName: {
-    flex: 1,
-    fontSize: fonts.sizes.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  chipNameSelected: {
-    color: colors.primaryDark,
-    fontWeight: '700',
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: radii.pill,
-  },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  adminBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(243, 133, 6, 0.18)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, gap: 10 },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#01885b' },
+  adminBadgeText: { color: '#0f0f0f', fontSize: 16, fontWeight: '600' },
+  logoutButton: { padding: 8, backgroundColor: 'rgb(221, 5, 5)', borderRadius: 8 },
 
-  // Legend
-  legend:     { flexDirection: 'row', gap: spacing.md },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  legendDot:  { width: 8, height: 8, borderRadius: radii.pill },
-  legendText: { fontSize: fonts.sizes.caption, color: colors.textMuted },
+  scrollCanvas: { padding: 32, maxWidth: 1200, width: '100%', alignSelf: 'center' },
 
-  // ── Log panel card ──
-  panelCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    ...shadow,
-  },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
+  sectionTitleIndicator: { width: 6, height: 28, backgroundColor: '#B45309', borderRadius: 3 },
+  sectionTitleText: { fontSize: 22, fontWeight: '700', color: BRONZE_COLORS.textDark },
 
-  // "Logged" badge next to section header
-  loggedBadge: {
+  createClassButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.successBg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
+    gap: 8,
+    backgroundColor: BRONZE_COLORS.bronzeAccent,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
   },
-  loggedBadgeText: {
-    fontSize: fonts.sizes.caption,
-    fontWeight: '700',
-    color: colors.success,
-  },
+  createClassButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 
-  // ── Log detail view ──
-  loggedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.successBg,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  loggedBannerText: {
-    fontSize: fonts.sizes.body,
-    fontWeight: '600',
-    color: colors.success,
-  },
-  detailCard: {
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
-  detailRow: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  detailLabel: {
-    fontSize: fonts.sizes.caption,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    color: colors.textMuted,
-    marginBottom: spacing.xs,
-  },
-  detailValue: {
-    fontSize: fonts.sizes.subtitle,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  assignmentBox: {
-    backgroundColor: colors.background,
-    borderRadius: radii.sm,
-    padding: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  assignmentText: {
-    fontSize: fonts.sizes.body,
-    color: colors.text,
-    lineHeight: 20,
-  },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    padding: spacing.lg,
-    borderRadius: radii.lg,
-  },
-  viewHistoryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    padding: spacing.lg,
-    borderRadius: radii.lg,
-    marginTop: spacing.sm,
-  },
-  viewHistoryBtnText: {
-    color: colors.textOnPrimary,
-    fontSize: fonts.sizes.body,
-    fontWeight: '700',
-  },
-  editBtnText: {
-    color: colors.textOnPrimary,
-    fontSize: fonts.sizes.body,
-    fontWeight: '700',
-  },
+  cardGrid: { gap: 20 },
+  cardContainer: { width: '100%' },
 
-  // ── Report Generator ──
-  reportToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radii.lg,
-    marginTop: spacing.xl,
-    marginBottom: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow,
-  },
-  reportToggleText: {
-    fontSize: fonts.sizes.subtitle,
-    fontWeight: '700',
-    color: colors.text,
-    flex: 1,
-  },
-  reportBody: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderTopWidth: 0,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-  },
-  //history modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    height: '80%',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: spacing.md,
-    marginBottom: spacing.md,
-  },
-  modalTitle: {
-    fontSize: fonts.sizes.title,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  modalSub: {
-    fontSize: fonts.sizes.body,
-    color: colors.textMuted,
-  },
-  closeModalBtn: {
-    padding: spacing.xs,
-  },
-  emptyHistoryText: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: fonts.sizes.body,
-    marginTop: spacing.xl,
-  },
-  historyCard: {
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  historyCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  historyDate: {
-    fontSize: fonts.sizes.body,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  historyBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  historyBadgeText: {
-    fontSize: fonts.sizes.caption,
-    fontWeight: '700',
-  },
-  historyCardBody: {
-    marginTop: spacing.xs,
-  },
-  historyMainText: {
-    fontSize: fonts.sizes.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  historySubText: {
-    fontSize: fonts.sizes.caption,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  historyNotesBox: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.sm,
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  historyNotesText: {
-    fontSize: fonts.sizes.caption,
-    color: colors.text,
-    lineHeight: 16,
-  },
+  center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 48 },
+  emptyText: { fontSize: 15, color: BRONZE_COLORS.textMuted, textAlign: 'center' },
+  errorText: { fontSize: 15, color: '#DD0505', textAlign: 'center' },
+  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: BRONZE_COLORS.bronzeAccent },
+  retryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  mobileBackdropLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(120, 53, 15, 0.4)' },
+  mobileDrawerContainer: { position: 'absolute', top: 62, bottom: 0, left: 0, width: DRAWER_WIDTH, backgroundColor: '#FFFFFF' },
 });

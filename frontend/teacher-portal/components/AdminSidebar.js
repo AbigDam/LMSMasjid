@@ -53,11 +53,12 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
       {/* Dashboard button */}
       <View style={styles.list}>
         <Pressable
-          onPress={() => navigation.navigate('AdminDashboardScreen')}
+          onPress={() => navigation.navigate('AdminDashboard')}
           style={[styles.item, !activeId && styles.itemActive]}
           accessibilityRole="button"
           accessibilityLabel="Main Dashboard"
         >
+
           <View style={[styles.iconChip, !activeId && styles.iconChipActive]}>
             <MaterialCommunityIcons
               name="view-dashboard"
@@ -72,7 +73,7 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
             Dashboard
           </Text>
         </Pressable>
-        </View>
+      </View>
 
       {/* Class button */}
       <View style={styles.list}>
