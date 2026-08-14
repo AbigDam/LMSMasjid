@@ -17,13 +17,14 @@
 // once that endpoint exists.
 // -----------------------------------------------------------------------------
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, Image, ScrollView, Pressable, Animated, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AdminSidebar from '../components/AdminSidebar';
 import { brand, brandImages } from '../constants/brand';
 import useAdminLayout, { DRAWER_WIDTH } from '../components/useAdminLayout';
+import api from '../api.js';
 
 const BRONZE_COLORS = {
   bronzeAccent: '#9A6A3C',
@@ -40,6 +41,10 @@ const BRONZE_COLORS = {
 export default function CourseView({ route, navigation }) {
   const { course: initialCourse } = route.params;
   const [course, setCourse] = useState(initialCourse);
+  const [teacherName, setTeacherName] = useState('');
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const layout = useAdminLayout();
   const { isWide, sidebarVisible, setSidebarVisible, menuOpen, setMenuOpen, translateX, backdrop, admin, courses, handleSignOut } = layout;
@@ -60,14 +65,47 @@ export default function CourseView({ route, navigation }) {
   //   refresh();
   // }, []);
 
-  const teacherName =
-    course.teacher_name ??
-    (typeof course.teacher === 'string'
-      ? course.teacher
-      : course.teacher && (course.teacher.first_name || course.teacher.last_name)
-      ? `${course.teacher.first_name ?? ''} ${course.teacher.last_name ?? ''}`.trim()
-      : null) ??
-    'Unassigned';
+  // const teacherName =
+  //   course.teachers ??
+  //   (typeof course.teacher === 'string'
+  //     ? course.teacher
+  //     : course.teacher && (course.teacher.first_name || course.teacher.last_name)
+  //     ? `${course.teacher.first_name ?? ''} ${course.teacher.last_name ?? ''}`.trim()
+  //     : null) ??
+  //   course.teachers;
+
+  const teacherIds = course.teachers ?? [];
+
+  const fetchTeacherDetails = useCallback(async () => {
+    if (teacherIds.length === 0) {
+      setTeacherName('Unassigned');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const responses = await Promise.all(
+        teacherIds.map((id) => {
+        return api.get(`/admin/teacher/${id}/`);
+        })
+      );
+      const names = responses.map((res) =>
+        `${res.data.first_name ?? ''} ${res.data.last_name ?? ''}`.trim()
+      );
+      setTeacherName(names.join(', '));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to load teacher details.');
+    } finally {
+      setLoading(false);
+    }
+  }, [teacherIds.join(',')]);
+
+  useEffect(() => {
+  fetchTeacherDetails();
+  }, [fetchTeacherDetails]);
 
   const isActive = course.status === 'active';
 

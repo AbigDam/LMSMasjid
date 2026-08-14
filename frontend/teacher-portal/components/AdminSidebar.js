@@ -54,20 +54,20 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
       <View style={styles.list}>
         <Pressable
           onPress={() => navigation.navigate('AdminDashboard')}
-          style={[styles.item, !activeId && styles.itemActive]}
+          style={[styles.item, activeId && styles.itemActive]}
           accessibilityRole="button"
           accessibilityLabel="Main Dashboard"
         >
 
-          <View style={[styles.iconChip, !activeId && styles.iconChipActive]}>
+          <View style={[styles.iconChip, activeId && styles.iconChipActive]}>
             <MaterialCommunityIcons
               name="view-dashboard"
               size={20}
-              color={!activeId ? colors.textOnPrimary : colors.sidebarText}
+              color={activeId ? colors.textOnPrimary : colors.sidebarText}
             />
           </View>
           <Text
-            style={[styles.itemLabel, !activeId && styles.itemLabelActive]}
+            style={[styles.itemLabel, activeId && styles.itemLabelActive]}
             numberOfLines={2}
           >
             Dashboard
@@ -98,35 +98,6 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
           </Text>
         </Pressable>
         </View>
-
-      <View style={styles.list}>
-        {courses.map((course) => {
-          const active = course.id === activeId;
-          return (
-            <Pressable
-              key={course.id}
-              onPress={() => onNavigate?.(course)}
-              style={[styles.item, active && styles.itemActive]}
-              accessibilityRole="button"
-              accessibilityLabel={course.title}
-            >
-              <View style={[styles.iconChip, active && styles.iconChipActive]}>
-                <MaterialCommunityIcons
-                  name="book-open-variant"
-                  size={20}
-                  color={active ? colors.textOnPrimary : colors.sidebarText}
-                />
-              </View>
-              <Text
-                style={[styles.itemLabel, active && styles.itemLabelActive]}
-                numberOfLines={2}
-              >
-                {course.title}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
 
       {/* Spacer pushes Sign Out to the bottom */}
       <View style={{ flex: 1 }} />

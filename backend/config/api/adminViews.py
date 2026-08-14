@@ -19,3 +19,18 @@ class ClassesList(APIView):
         classes = Class.objects
         serializer  = ClassSerializer(classes, many=True)
         return Response(serializer.data)
+
+# Return a specific teacher's details
+class TeacherDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id):
+        teacher = User.objects.get(id=id)
+        print(teacher)
+        return Response({
+            "first_name": teacher.first_name,
+            "last_name": teacher.last_name,
+            "email": teacher.email,
+            "username": teacher.username,
+            "id": request.user.id,
+        })
