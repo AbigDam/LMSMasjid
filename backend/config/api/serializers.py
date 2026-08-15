@@ -66,6 +66,19 @@ class ClassSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         return "active" if obj.status else "inactive"
 
+class UpdateClassSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Class
+        fields = ["class_name", "program", "schedule", "room", "status"]
+
+        extra_kwargs = {
+            "class_name": {"required": False, "allow_blank": True},
+            "program": {"required": False, "allow_blank": True},
+            "schedule": {"required": False, "allow_blank": True},
+            "room": {"required": False, "allow_blank": True},
+            "status": {"required": False},
+        }
+
 class AnnouncementSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="announcement_id", read_only=True)
     date = serializers.SerializerMethodField()
@@ -288,3 +301,8 @@ class ReportCardSerializer(serializers.ModelSerializer):
             "trimester",
             "date",
         ]
+
+class TeacherListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "first_name", "last_name", "email"]

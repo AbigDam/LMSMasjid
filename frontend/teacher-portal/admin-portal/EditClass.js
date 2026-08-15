@@ -2,20 +2,19 @@
 // -----------------------------------------------------------------------------
 // Al-Hidaya — Admin: Edit Class
 //
-// Opened from CourseView's Edit button. Same field set as
-// CreateClassAccountsScreen's "Class Details" section (class name, program,
-// schedule, room) — pre-filled from the course passed via navigation params.
+// Opened from CourseView's Edit button. Editable fields: class name, program,
+// schedule, room, status (active/inactive toggle), and teacher assignment
+// (checklist against GET /admin/teachers/) — pre-filled from the course
+// passed via navigation params, and saved via PATCH /edit_class/<id>/.
+// Also supports deleting the course (with a confirmation prompt) via
+// DELETE /edit_class/<id>/. See backend/edit_class_view.py for the matching
+// Django view/serializer.
 //
 // Layout/chrome (AdminSidebar, responsive breakpoint, mobile drawer, header)
 // mirrors DashboardScreen via the shared useAdminLayout hook.
-//
-// NOTE: There's no update-course endpoint yet. handleSubmit below calls a
-// placeholder PATCH /edit_class/<id>/ — swap the URL once the real route
-// exists. Everything else (validation, loading state, error handling) is
-// already wired up.
 // -----------------------------------------------------------------------------
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -24,27 +23,45 @@ import {
   Pressable,
   ScrollView,
   Animated,
+  Switch,
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api.js';
 import AdminSidebar from '../components/AdminSidebar';
 import { brand, brandImages } from '../constants/brand';
+import { colors, spacing, radii, fonts } from '../constants/theme.js';
 import useAdminLayout, { DRAWER_WIDTH } from '../components/useAdminLayout';
 
-const BRONZE_COLORS = {
-  bronzeAccent: '#9A6A3C',
-  bronzeBright: '#B45309',
-  bgCanvas: '#FAF9F6',
-  surfaceWhite: '#FFFFFF',
-  textDark: '#111827',
-  textMuted: '#4B5563',
-  borderLight: '#E5E7EB',
-  danger: '#DD0505',
-};
+// Alert.alert with multiple buttons (Cancel/Delete) isn't implemented by
+// react-native-web — it silently no-ops in a browser, which made the delete
+// confirmation appear to do nothing. These helpers fall back to the
+// browser's native confirm()/alert() on web, and use the real Alert.alert
+// on iOS/Android where it works correctly.
+function confirmDialog(title, message) {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+    ]);
+  });
+}
+
+function notify(title, message, onDismiss) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+    onDismiss?.();
+  } else {
+    Alert.alert(title, message, onDismiss ? [{ text: 'OK', onPress: onDismiss }] : undefined);
+  }
+}
 
 export default function EditClass({ route, navigation }) {
   const { course } = route.params;
@@ -56,9 +73,45 @@ export default function EditClass({ route, navigation }) {
   const [program, setProgram] = useState(course.program ?? '');
   const [schedule, setSchedule] = useState(course.schedule ?? '');
   const [room, setRoom] = useState(course.room ?? '');
+  const [isActive, setIsActive] = useState(course.status === 'active' || course.status === true);
 
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // Teacher assignment — fetch every teacher so the admin can check/uncheck
+  // who's assigned. Assumed endpoint: GET /admin/teachers/ (adjust the path
+  // below if yours differs). Handles both a bare array response and a
+  // paginated { results: [...] } response.
+  const [allTeachers, setAllTeachers] = useState([]);
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState(course.teachers ?? []);
+  const [teachersLoading, setTeachersLoading] = useState(true);
+  const [teachersError, setTeachersError] = useState(null);
+
+  const fetchAllTeachers = useCallback(async () => {
+    setTeachersLoading(true);
+    setTeachersError(null);
+    try {
+      const response = await api.get('/admin/teachers/');
+      const list = Array.isArray(response.data) ? response.data : response.data?.results ?? [];
+      setAllTeachers(list);
+    } catch (err) {
+      console.error(err);
+      setTeachersError('Failed to load teacher list.');
+    } finally {
+      setTeachersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllTeachers();
+  }, [fetchAllTeachers]);
+
+  function toggleTeacher(teacherId) {
+    setSelectedTeacherIds((prev) =>
+      prev.includes(teacherId) ? prev.filter((id) => id !== teacherId) : [...prev, teacherId]
+    );
+  }
 
   function validate() {
     const newErrors = {};
@@ -80,21 +133,20 @@ export default function EditClass({ route, navigation }) {
       program: program.trim(),
       schedule: schedule.trim(),
       room: room.trim(),
+      status: isActive,
+      teachers: selectedTeacherIds,
     };
 
     try {
-      // PLACEHOLDER endpoint — update once the backend route exists.
       await api.patch(`/edit_class/${course.id}/`, payload);
-      Alert.alert('Saved', 'Course details updated.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      notify('Saved', 'Course details updated.', () => navigation.goBack());
     } catch (err) {
       console.error(err?.response?.data || err);
       const message =
         err?.response?.data?.error ||
         err?.response?.data?.detail ||
         'Could not save changes. Please try again.';
-      Alert.alert('Something went wrong', message);
+      notify('Something went wrong', message);
     } finally {
       setSubmitting(false);
     }
@@ -103,6 +155,33 @@ export default function EditClass({ route, navigation }) {
   function handleNavigateClass(nextCourse) {
     navigation.navigate('CourseView', { course: nextCourse });
     setMenuOpen(false);
+  }
+
+  async function handleDeletePress() {
+    const confirmed = await confirmDialog(
+      'Delete Course?',
+      `This will permanently delete "${className || course.title || course.name}". This can't be undone.`
+    );
+    if (confirmed) {
+      handleConfirmDelete();
+    }
+  }
+
+  async function handleConfirmDelete() {
+    setDeleting(true);
+    try {
+      await api.delete(`/admin/update_class/${course.id}/`);
+      navigation.reset({ index: 0, routes: [{ name: 'ManageCourses' }] });
+    } catch (err) {
+      console.error(err?.response?.data || err);
+      const message =
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        'Could not delete this course. Please try again.';
+      notify('Something went wrong', message);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -116,11 +195,11 @@ export default function EditClass({ route, navigation }) {
               style={styles.menuIconButton}
               hitSlop={12}
             >
-              <Ionicons name={sidebarVisible ? 'close' : 'menu'} size={28} color={BRONZE_COLORS.bronzeAccent} />
+              <Ionicons name={sidebarVisible ? 'close' : 'menu'} size={28} color={colors.primary} />
             </Pressable>
           ) : (
             <Pressable onPress={() => setMenuOpen(true)} style={styles.menuIconButton} hitSlop={12}>
-              <Ionicons name="menu" size={28} color={BRONZE_COLORS.bronzeAccent} />
+              <Ionicons name="menu" size={28} color={colors.primary} />
             </Pressable>
           )}
           <Image source={brandImages.logo} style={styles.hubLogo} resizeMode="contain" />
@@ -133,7 +212,7 @@ export default function EditClass({ route, navigation }) {
             <Text style={styles.adminBadgeText}>{admin?.first_name} {admin?.last_name}</Text>
           </View>
           <Pressable onPress={handleSignOut} style={styles.logoutButton}>
-            <Ionicons name="log-out-outline" size={26} color="#FFFFFF" />
+            <Ionicons name="log-out-outline" size={26} color={colors.textOnPrimary} />
           </Pressable>
         </View>
       </View>
@@ -156,7 +235,7 @@ export default function EditClass({ route, navigation }) {
         <ScrollView contentContainerStyle={styles.scrollCanvas} keyboardShouldPersistTaps="handled">
           <View style={styles.sectionHeaderRow}>
             <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ marginRight: 4 }}>
-              <Ionicons name="chevron-back" size={24} color={BRONZE_COLORS.textDark} />
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
             </Pressable>
             <View style={styles.sectionTitleIndicator} />
             <Text style={styles.sectionTitleText}>Edit Class</Text>
@@ -198,17 +277,78 @@ export default function EditClass({ route, navigation }) {
                   />
                 </View>
               </View>
+
+              <View style={styles.statusRow}>
+                <View>
+                  <Text style={styles.fieldLabel}>Status</Text>
+                  <Text style={styles.statusHint}>{isActive ? 'Active' : 'Inactive'}</Text>
+                </View>
+                <Switch
+                  value={isActive}
+                  onValueChange={setIsActive}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.textOnPrimary}
+                />
+              </View>
+            </View>
+
+            {/* Teachers — check/uncheck to assign or remove. */}
+            <View style={styles.card}>
+              <Text style={styles.fieldLabel}>Teachers</Text>
+              {teachersLoading ? (
+                <ActivityIndicator color={colors.primary} style={{ marginTop: 8 }} />
+              ) : teachersError ? (
+                <Text style={styles.fieldErrorText}>{teachersError}</Text>
+              ) : allTeachers.length === 0 ? (
+                <Text style={styles.teacherReadOnlyText}>No teachers found.</Text>
+              ) : (
+                <View style={{ marginTop: 8, gap: 4 }}>
+                  {allTeachers.map((teacher) => {
+                    const selected = selectedTeacherIds.includes(teacher.id);
+                    const name = `${teacher.first_name ?? ''} ${teacher.last_name ?? ''}`.trim() || teacher.email;
+                    return (
+                      <Pressable
+                        key={teacher.id}
+                        onPress={() => toggleTeacher(teacher.id)}
+                        style={styles.teacherRow}
+                      >
+                        <Ionicons
+                          name={selected ? 'checkbox' : 'square-outline'}
+                          size={20}
+                          color={selected ? colors.primary : colors.textMuted}
+                        />
+                        <Text style={styles.teacherRowText}>{name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
             <Pressable
               style={[styles.primaryButton, submitting && styles.primaryButtonDisabled]}
               onPress={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || deleting}
             >
               {submitting ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.textOnPrimary} />
               ) : (
                 <Text style={styles.primaryButtonText}>Save Changes</Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={[styles.deleteButton, deleting && styles.primaryButtonDisabled]}
+              onPress={handleDeletePress}
+              disabled={submitting || deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator color={colors.danger} />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  <Text style={styles.deleteButtonText}>Delete Course</Text>
+                </>
               )}
             </Pressable>
           </View>
@@ -243,7 +383,7 @@ function Field({ label, error, ...inputProps }) {
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         style={[styles.fieldInput, error && styles.fieldInputError]}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor={colors.placeholder}
         {...inputProps}
       />
       {error ? <Text style={styles.fieldErrorText}>{error}</Text> : null}
@@ -252,75 +392,104 @@ function Field({ label, error, ...inputProps }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: BRONZE_COLORS.bronzeAccent },
-  mainLayout: { flex: 1, flexDirection: 'row', backgroundColor: BRONZE_COLORS.bgCanvas },
-  desktopNavWrapper: { width: DRAWER_WIDTH, backgroundColor: '#ffffff', borderRightWidth: 1, borderRightColor: BRONZE_COLORS.borderLight },
+  safe: { flex: 1, backgroundColor: colors.primary },
+  mainLayout: { flex: 1, flexDirection: 'row', backgroundColor: colors.background },
+  desktopNavWrapper: { width: DRAWER_WIDTH, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border },
 
   hubHeader: {
     height: 76,
-    backgroundColor: BRONZE_COLORS.surfaceWhite,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xl,
     borderBottomWidth: 4,
-    borderBottomColor: BRONZE_COLORS.bronzeAccent,
+    borderBottomColor: colors.primary,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  menuIconButton: { padding: 4, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
-  hubLogo: { width: 46, height: 46, borderRadius: 10 },
-  hubTitle: { fontSize: 20, fontWeight: '700', color: BRONZE_COLORS.textDark, letterSpacing: 0.3 },
+  menuIconButton: { padding: spacing.xs, marginRight: spacing.xs, justifyContent: 'center', alignItems: 'center' },
+  hubLogo: { width: 46, height: 46, borderRadius: radii.sm },
+  hubTitle: { fontSize: fonts.sizes.title, fontWeight: '700', color: colors.text, letterSpacing: 0.3 },
 
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  adminBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(243, 133, 6, 0.18)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, gap: 10 },
-  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#01885b' },
-  adminBadgeText: { color: '#0f0f0f', fontSize: 16, fontWeight: '600' },
-  logoutButton: { padding: 8, backgroundColor: 'rgb(221, 5, 5)', borderRadius: 8 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg + 4 },
+  adminBadgeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryLight, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.pill, gap: spacing.sm },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success },
+  adminBadgeText: { color: colors.text, fontSize: fonts.sizes.subtitle, fontWeight: '600' },
+  logoutButton: { padding: spacing.sm, backgroundColor: colors.danger, borderRadius: radii.sm },
 
   scrollCanvas: { padding: 32, maxWidth: 1200, width: '100%', alignSelf: 'center', paddingBottom: 48 },
 
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24, maxWidth: 700, width: '100%', alignSelf: 'center' },
-  sectionTitleIndicator: { width: 6, height: 24, backgroundColor: BRONZE_COLORS.bronzeBright, borderRadius: 3 },
-  sectionTitleText: { fontSize: 20, fontWeight: '700', color: BRONZE_COLORS.textDark },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xl, maxWidth: 700, width: '100%', alignSelf: 'center' },
+  sectionTitleIndicator: { width: 6, height: 24, backgroundColor: colors.accent, borderRadius: 3 },
+  sectionTitleText: { fontSize: fonts.sizes.title, fontWeight: '700', color: colors.text },
 
   contentMaxWidth: { maxWidth: 700, width: '100%', alignSelf: 'center' },
 
   card: {
-    backgroundColor: BRONZE_COLORS.surfaceWhite,
-    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: BRONZE_COLORS.borderLight,
-    padding: 20,
-    marginBottom: 28,
+    borderColor: colors.border,
+    padding: spacing.lg + 4,
+    marginBottom: spacing.xl + 4,
   },
 
-  row2: { flexDirection: 'row', gap: 16 },
+  row2: { flexDirection: 'row', gap: spacing.lg },
   row2Item: { flex: 1 },
 
-  fieldGroup: { marginBottom: 14 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: BRONZE_COLORS.textMuted, marginBottom: 6 },
+  fieldGroup: { marginBottom: spacing.md + 2 },
+  fieldLabel: { fontSize: fonts.sizes.caption + 1, fontWeight: '600', color: colors.textMuted, marginBottom: spacing.xs + 2 },
   fieldInput: {
     borderWidth: 1,
-    borderColor: BRONZE_COLORS.borderLight,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: BRONZE_COLORS.textDark,
-    backgroundColor: BRONZE_COLORS.bgCanvas,
+    borderColor: colors.inputBorder,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
+    fontSize: fonts.sizes.subtitle - 1,
+    color: colors.text,
+    backgroundColor: colors.background,
   },
-  fieldInputError: { borderColor: BRONZE_COLORS.danger },
-  fieldErrorText: { color: BRONZE_COLORS.danger, fontSize: 12, marginTop: 4 },
+  fieldInputError: { borderColor: colors.danger },
+  fieldErrorText: { color: colors.danger, fontSize: fonts.sizes.caption, marginTop: spacing.xs },
+
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.sm,
+    marginTop: spacing.sm - 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  statusHint: { fontSize: fonts.sizes.subtitle - 1, fontWeight: '700', color: colors.text, marginTop: 2 },
+
+  teacherReadOnlyText: { fontSize: fonts.sizes.subtitle - 1, fontWeight: '600', color: colors.text, marginTop: spacing.xs + 2 },
+  teacherRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, paddingVertical: spacing.sm },
+  teacherRowText: { fontSize: fonts.sizes.subtitle - 1, fontWeight: '600', color: colors.text },
 
   primaryButton: {
-    backgroundColor: BRONZE_COLORS.bronzeBright,
-    borderRadius: 10,
-    paddingVertical: 16,
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
   },
   primaryButtonDisabled: { opacity: 0.6 },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+  primaryButtonText: { color: colors.textOnPrimary, fontWeight: '700', fontSize: fonts.sizes.subtitle },
 
-  mobileBackdropLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(120, 53, 15, 0.4)' },
-  mobileDrawerContainer: { position: 'absolute', top: 62, bottom: 0, left: 0, width: DRAWER_WIDTH, backgroundColor: '#FFFFFF' },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md + 2,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerBg,
+  },
+  deleteButtonText: { color: colors.danger, fontWeight: '700', fontSize: fonts.sizes.subtitle - 1 },
+
+  mobileBackdropLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(43, 33, 23, 0.4)' },
+  mobileDrawerContainer: { position: 'absolute', top: 62, bottom: 0, left: 0, width: DRAWER_WIDTH, backgroundColor: colors.surface },
 });

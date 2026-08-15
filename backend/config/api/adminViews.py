@@ -1,4 +1,5 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
+from rest_framework import status as http_status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.contrib.auth import get_user_model
@@ -34,3 +35,30 @@ class TeacherDetailView(APIView):
             "username": teacher.username,
             "id": request.user.id,
         })
+
+class TeachersListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TeacherListSerializer
+
+    def get_queryset(self):
+        return User.objects.filter(role=0)  
+
+class UpdateClassView(APIView):
+    permission_classes = [IsAuthenticated]
+ 
+    def patch(self, request, id):
+        classroom = get_object_or_404(Class, class_id=id)
+ 
+        serializer = UpdateClassSerializer(classroom, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(ClassSerializer(classroom).data)
+ 
+        return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, id):
+        classroom = get_object_or_404(Class, class_id=id)
+
+        classroom.delete()
+        return Response(status=http_status.HTTP_204_NO_CONTENT)
+
