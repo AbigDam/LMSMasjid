@@ -38,4 +38,7 @@ urlpatterns = [
     path("admin/teacher/<int:id>/", TeacherDetailView.as_view(), name="admin_teacher_detail"),
     path("admin/teachers/", TeachersListView.as_view(), name="admin_teachers_list"),
     path("admin/update_class/<int:id>/", UpdateClassView.as_view(), name="admin_update_class"),
+    path('admin/available_students/<int:class_id>/', AvailableStudentsView.as_view(), name="available_students"),
+    path('admin/add_students_to_class/', AddStudentsToClassView.as_view(), name="add_students_to_class"),
+    path('admin/remove_student_from_class/', RemoveStudentFromClassView.as_view(), name="remove_student_from_class"),  
 ]
