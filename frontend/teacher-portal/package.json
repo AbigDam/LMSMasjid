@@ -22,11 +22,11 @@
     "react-native-screens": "~4.16.0",
     "react-native-web": "^0.21.2"
   },
-"scripts": {
-  "start": "expo start",
-  "predeploy": "npx expo export --platform web --clear && touch dist/.nojekyll",
-  "deploy": "gh-pages -d dist -b gh-pages -f"
-},
+  "scripts": {
+    "start": "expo start",
+    "predeploy": "npx expo export --platform web --clear && touch dist/.nojekyll",
+    "deploy": "gh-pages -d dist -b gh-pages -f"
+  },
   "private": true,
   "devDependencies": {
     "@types/react": "~19.1.10",

@@ -24,6 +24,7 @@ import AdminDashboardScreen from './admin-portal/AdminDashboardScreen';
 import ManageCourses from './admin-portal/ManageCourses';
 import CourseView from './admin-portal/CourseView';
 import EditClass from './admin-portal/EditClass';
+import AdminStudentRoster from './admin-portal/AdminStudentRoster';
 
 const Stack = createNativeStackNavigator();
 
@@ -77,6 +78,7 @@ function AppStack({ user, userError, onRetryUser }) {
           <Stack.Screen name="CourseView" component={CourseView} />
           <Stack.Screen name="EditClass" component={EditClass} />
           <Stack.Screen name="CreateClassAccounts" component={CreateClassAccountsScreen} />
+          <Stack.Screen name="AdminStudentRoster" component={AdminStudentRoster} />
         </Stack.Navigator>
       );
     default:

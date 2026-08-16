@@ -219,7 +219,7 @@ export default function CourseView({ route, navigation }) {
 
             <Pressable
               style={styles.secondaryButton}
-              onPress={() => navigation.navigate('StudentRoster', { course })}
+              onPress={() => navigation.navigate('AdminStudentRoster', { course })}
             >
               <Ionicons name="people-outline" size={18} color={BRONZE_COLORS.bronzeAccent} />
               <Text style={styles.secondaryButtonText}>View Student Roster</Text>
