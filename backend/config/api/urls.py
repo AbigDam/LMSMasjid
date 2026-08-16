@@ -35,4 +35,7 @@ urlpatterns = [
 
     # Admin Views
     path("admin/classes/", ClassesList.as_view(), name="admin_classes"),
+    path("admin/teacher/<int:id>/", TeacherDetailView.as_view(), name="admin_teacher_detail"),
+    path("admin/teachers/", TeachersListView.as_view(), name="admin_teachers_list"),
+    path("admin/update_class/<int:id>/", UpdateClassView.as_view(), name="admin_update_class"),
 ]

@@ -54,7 +54,7 @@ export default function ManageCourses({ navigation }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/select_classes/');
+      const response = await api.get('/admin/classes/');
       setCourses(response.data ?? []);
     } catch (err) {
       console.error(err);
