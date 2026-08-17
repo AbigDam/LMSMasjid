@@ -216,7 +216,7 @@ export default function AdminStudentRoster({ route, navigation }) {
           <View style={styles.desktopNavWrapper}>
             <AdminSidebar
               courses={courses}
-              activeId={course.id}
+              activeId="courses"
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
               onClose={() => setSidebarVisible(false)}
@@ -303,7 +303,7 @@ export default function AdminStudentRoster({ route, navigation }) {
           <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
             <AdminSidebar
               courses={courses}
-              activeId={course.id}
+              activeId="courses"
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
               onClose={() => setMenuOpen(false)}

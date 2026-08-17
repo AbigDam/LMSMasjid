@@ -54,20 +54,20 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
       <View style={styles.list}>
         <Pressable
           onPress={() => navigation.navigate('AdminDashboard')}
-          style={[styles.item, activeId && styles.itemActive]}
+          style={[styles.item, activeId === 'dashboard' && styles.itemActive]}
           accessibilityRole="button"
           accessibilityLabel="Main Dashboard"
         >
 
-          <View style={[styles.iconChip, activeId && styles.iconChipActive]}>
+          <View style={[styles.iconChip, activeId === 'dashboard' && styles.iconChipActive]}>
             <MaterialCommunityIcons
               name="view-dashboard"
               size={20}
-              color={activeId ? colors.textOnPrimary : colors.sidebarText}
+              color={activeId === 'dashboard' ? colors.textOnPrimary : colors.sidebarText}
             />
           </View>
           <Text
-            style={[styles.itemLabel, activeId && styles.itemLabelActive]}
+            style={[styles.itemLabel, activeId === 'dashboard' && styles.itemLabelActive]}
             numberOfLines={2}
           >
             Dashboard
@@ -79,22 +79,46 @@ export default function Sidebar({ courses = [], activeId, onNavigate, onSignOut,
       <View style={styles.list}>
         <Pressable
           onPress={() => navigation.navigate('ManageCourses')}
-          style={[styles.item, !activeId && styles.itemActive]}
+          style={[styles.item, activeId === 'courses' && styles.itemActive]}
           accessibilityRole="button"
           accessibilityLabel="Manage Courses"
         >
-          <View style={[styles.iconChip, !activeId && styles.iconChipActive]}>
+          <View style={[styles.iconChip, activeId === 'courses' && styles.iconChipActive]}>
             <MaterialCommunityIcons
               name="book-open-variant"
               size={20}
-              color={!activeId ? colors.textOnPrimary : colors.sidebarText}
+              color={activeId === 'courses' ? colors.textOnPrimary : colors.sidebarText}
             />
           </View>
           <Text
-            style={[styles.itemLabel, !activeId && styles.itemLabelActive]}
+            style={[styles.itemLabel, activeId === 'courses' && styles.itemLabelActive]}
             numberOfLines={2}
           >
             Manage Courses
+          </Text>
+        </Pressable>
+        </View>
+
+      {/* Manage Users button */}
+      <View style={styles.list}>
+        <Pressable
+          onPress={() => navigation.navigate('ManageUsers')}
+          style={[styles.item, activeId === 'users' && styles.itemActive]}
+          accessibilityRole="button"
+          accessibilityLabel="Manage Users"
+        >
+          <View style={[styles.iconChip, activeId === 'users' && styles.iconChipActive]}>
+            <MaterialCommunityIcons
+              name="account-group"
+              size={20}
+              color={activeId === 'users' ? colors.textOnPrimary : colors.sidebarText}
+            />
+          </View>
+          <Text
+            style={[styles.itemLabel, activeId === 'users' && styles.itemLabelActive]}
+            numberOfLines={2}
+          >
+            Manage Users
           </Text>
         </Pressable>
         </View>

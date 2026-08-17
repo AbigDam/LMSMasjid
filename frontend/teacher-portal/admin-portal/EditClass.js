@@ -138,7 +138,7 @@ export default function EditClass({ route, navigation }) {
     };
 
     try {
-      await api.patch(`/edit_class/${course.id}/`, payload);
+      await api.patch(`/admin/update_class/${course.id}/`, payload);
       notify('Saved', 'Course details updated.', () => navigation.goBack());
     } catch (err) {
       console.error(err?.response?.data || err);
@@ -222,8 +222,8 @@ export default function EditClass({ route, navigation }) {
         {isWide && sidebarVisible && (
           <View style={styles.desktopNavWrapper}>
             <AdminSidebar
+              activeId="courses"
               courses={courses}
-              activeId={course.id}
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
               onClose={() => setSidebarVisible(false)}
@@ -364,8 +364,8 @@ export default function EditClass({ route, navigation }) {
 
           <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
             <AdminSidebar
+              activeId="courses"
               courses={courses}
-              activeId={course.id}
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
               onClose={() => setMenuOpen(false)}
