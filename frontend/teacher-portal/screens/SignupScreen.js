@@ -32,14 +32,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 
 export default function SignupScreen({ navigation }) {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState({});
 
-function validate(trimmedUsername, trimmedEmail) {
+function validate(trimmedFirstName, trimmedLastName, trimmedUsername, trimmedEmail) {
   const next = {};
+
+  if (!trimmedFirstName) {
+    next.firstName = 'First name is required.';
+  }
+
+  if (!trimmedLastName) {
+    next.lastName = 'Last name is required.';
+  }
 
   if (!trimmedUsername) {
     next.username = 'Username is required.';
@@ -70,10 +80,14 @@ const API_URL = process.env.EXPO_PUBLIC_BASE_URL;
 const { setAuthenticated } = useAuth();
 
 async function handleSignup() {
+  const trimmedFirstName = firstName.trim();
+  const trimmedLastName = lastName.trim();
   const trimmedUsername = username.trim();
   const trimmedEmail = email.trim();
 
   const validationErrors = validate(
+    trimmedFirstName,
+    trimmedLastName,
     trimmedUsername,
     trimmedEmail
   );
@@ -86,9 +100,10 @@ async function handleSignup() {
 
   try {
     console.log('Registering to :', `${API_URL}/api/register/`); // Log the API URL to verify it's being read correctly
-    const response = await axios.post(
-      `${API_URL}/api/register/`,
+    const response = await api.post('/register/',
       {
+        first_name: trimmedFirstName,
+        last_name: trimmedLastName,
         username: trimmedUsername,
         email: trimmedEmail,
         password,
@@ -121,6 +136,33 @@ async function handleSignup() {
     <AuthScene>
       <Text style={styles.welcome}>Create your account</Text>
       <Text style={styles.welcomeSub}>Join the Al-Hidaya teaching team</Text>
+
+    <View style={styles.nameRow}>
+      <View style={styles.nameField}>
+        <TextField
+          label="First Name"
+          iconName="person-outline"
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          error={errors.firstName}
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+      </View>
+      <View style={styles.nameField}>
+        <TextField
+          label="Last Name"
+          iconName="person-outline"
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
+          error={errors.lastName}
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+      </View>
+    </View>
 
     <TextField
       label="Username"
@@ -199,6 +241,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  nameField: {
+    flex: 1,
   },
   primaryBtn: {
     flexDirection: 'row',

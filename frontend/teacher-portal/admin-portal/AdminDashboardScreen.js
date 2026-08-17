@@ -244,7 +244,7 @@ useEffect(() => {
           <View style={styles.desktopNavWrapper}>
             <AdminSidebar
               courses={courses}
-              activeId={courses[0]?.id}
+              activeId="dashboard"
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
               onClose={() => setAdminSidebarVisible(false)}
@@ -328,7 +328,7 @@ useEffect(() => {
           <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
             <AdminSidebar
               courses={courses}
-              activeId={courses[0]?.id}
+              activeId="dashboard"
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
               onClose={() => setMenuOpen(false)}

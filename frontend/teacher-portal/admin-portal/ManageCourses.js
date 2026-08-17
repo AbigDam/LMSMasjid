@@ -111,6 +111,7 @@ export default function ManageCourses({ navigation }) {
         {isWide && sidebarVisible && (
           <View style={styles.desktopNavWrapper}>
             <AdminSidebar
+              activeId="courses"
               courses={courses}
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}
@@ -174,6 +175,7 @@ export default function ManageCourses({ navigation }) {
 
           <Animated.View style={[styles.mobileDrawerContainer, { transform: [{ translateX }] }]}>
             <AdminSidebar
+              activeId="courses"
               courses={courses}
               onNavigate={handleNavigateClass}
               onSignOut={handleSignOut}

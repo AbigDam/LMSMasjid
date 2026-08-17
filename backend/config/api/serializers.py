@@ -8,11 +8,13 @@ from datetime import timedelta
 User = get_user_model()
 
 class RegisterSerializer(serializers.Serializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
     username = serializers.CharField()
     email = serializers.EmailField()
-    password = serializers.CharField(write_only = True)
+    password = serializers.CharField(write_only=True)
     role = serializers.CharField()
-
+ 
     def create(self, validated_data):
         role_name = validated_data.pop("role")
         if role_name == "Teacher":
@@ -21,13 +23,23 @@ class RegisterSerializer(serializers.Serializer):
             role_obj = 1
         elif role_name == "Student":
             role_obj = 2
-
-        user = User.objects.create_user(username = validated_data["username"],
-                            email = validated_data["email"],
-                            password = validated_data["password"],
-                            role = role_obj)
-
+ 
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data["first_name"],
+            last_name=validated_data["last_name"],
+            role=role_obj,
+        )
+ 
         return user
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "first_name", "last_name", "username", "email", "role"]
+ 
     
 class CreateClassSerializer(serializers.Serializer):
     class_name = serializers.CharField()
